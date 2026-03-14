@@ -1,8 +1,8 @@
-# CLAUDE.md — Instructions for AI Coding Agents
+# CLAUDE.md for AI Coding Agents
 
 ## Project
 
-bolt402 — L402 client SDK for AI agent frameworks. Rust workspace.
+bolt402: L402 client SDK for AI agent frameworks. Rust workspace.
 
 ## Quick Start
 
@@ -50,7 +50,7 @@ Check `Cargo.toml` at workspace root for pinned versions. Don't add new dependen
 
 ## What NOT to Do
 
-- Don't add `println!` for debugging — use `tracing`
+- Don't add `println!` for debugging, use `tracing`
 - Don't use `unsafe` without extremely good reason
 - Don't add feature flags unless architecturally necessary
 - Don't break the public API without discussion

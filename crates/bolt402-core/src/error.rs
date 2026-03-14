@@ -1,3 +1,5 @@
+//! Errors that can occur during L402 client operations.
+
 use bolt402_proto::L402Error;
 use thiserror::Error;
 
@@ -14,11 +16,17 @@ pub enum ClientError {
 
     /// Lightning payment failed.
     #[error("payment failed: {reason}")]
-    PaymentFailed { reason: String },
+    PaymentFailed {
+        /// Description of why the payment failed.
+        reason: String,
+    },
 
     /// Budget limit exceeded.
     #[error("budget exceeded: {reason}")]
-    BudgetExceeded { reason: String },
+    BudgetExceeded {
+        /// Description of which budget limit was exceeded.
+        reason: String,
+    },
 
     /// The server did not return a valid L402 challenge with the 402 response.
     #[error("server returned 402 but no valid WWW-Authenticate header")]
@@ -30,9 +38,15 @@ pub enum ClientError {
 
     /// The request was not retried successfully after payment.
     #[error("retry after payment failed: {reason}")]
-    RetryFailed { reason: String },
+    RetryFailed {
+        /// Description of why the retry failed.
+        reason: String,
+    },
 
     /// Backend-specific error.
     #[error("backend error: {reason}")]
-    Backend { reason: String },
+    Backend {
+        /// Description of the backend error.
+        reason: String,
+    },
 }

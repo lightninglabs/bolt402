@@ -1,4 +1,4 @@
-# AGENTS.md — bolt402
+# AGENTS.md
 
 ## Overview
 
@@ -31,13 +31,13 @@ bolt402/
 ### Crate Dependency Graph
 
 ```
-bolt402-proto  (no internal deps — shared protocol types)
+bolt402-proto  (no internal deps, shared protocol types)
      ↑
-bolt402-core   (depends on proto — client engine, ports, adapters)
+bolt402-core   (depends on proto: client engine, ports, adapters)
      ↑
-bolt402-lnd    (depends on core — implements LnBackend for LND)
+bolt402-lnd    (depends on core: implements LnBackend for LND)
 
-bolt402-mock   (depends on proto — standalone mock L402 server)
+bolt402-mock   (depends on proto: standalone mock L402 server)
 ```
 
 ### Design Principles
@@ -53,7 +53,7 @@ bolt402-mock   (depends on proto — standalone mock L402 server)
 
 - **Conventional commits**: `feat:`, `fix:`, `chore:`, `test:`, `docs:`, `ci:`, `refactor:`
 - One logical change per commit
-- PRs are squash-merged — one clean commit per PR
+- PRs are squash-merged, one clean commit per PR
 
 ### PRs
 

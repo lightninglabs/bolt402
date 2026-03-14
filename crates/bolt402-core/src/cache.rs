@@ -46,12 +46,7 @@ impl Default for InMemoryTokenStore {
 
 #[async_trait]
 impl TokenStore for InMemoryTokenStore {
-    async fn put(
-        &self,
-        endpoint: &str,
-        macaroon: &str,
-        preimage: &str,
-    ) -> Result<(), ClientError> {
+    async fn put(&self, endpoint: &str, macaroon: &str, preimage: &str) -> Result<(), ClientError> {
         let mut inner = self.inner.write().await;
 
         // Evict oldest entry if at capacity and this is a new key
@@ -67,9 +62,10 @@ impl TokenStore for InMemoryTokenStore {
             inner.insertion_order.retain(|k| k != endpoint);
         }
 
-        inner
-            .tokens
-            .insert(endpoint.to_string(), (macaroon.to_string(), preimage.to_string()));
+        inner.tokens.insert(
+            endpoint.to_string(),
+            (macaroon.to_string(), preimage.to_string()),
+        );
         inner.insertion_order.push(endpoint.to_string());
 
         Ok(())

@@ -137,9 +137,11 @@ impl L402Challenge {
 
     /// Parse a single `key="value"` pair.
     fn parse_kv(param: &str) -> Result<(String, String), L402Error> {
-        let (key, rest) = param.split_once('=').ok_or_else(|| L402Error::InvalidChallenge {
-            reason: format!("expected key=value pair, got: {param}"),
-        })?;
+        let (key, rest) = param
+            .split_once('=')
+            .ok_or_else(|| L402Error::InvalidChallenge {
+                reason: format!("expected key=value pair, got: {param}"),
+            })?;
 
         let value = rest.trim().trim_matches('"').to_string();
         Ok((key.trim().to_lowercase(), value))
@@ -170,7 +172,8 @@ mod tests {
 
     #[test]
     fn parse_challenge_with_address() {
-        let header = r#"L402 macaroon="YWJjZGVm", invoice="lnbc100n1pj9nr7mpp5test", address="bc1qtest""#;
+        let header =
+            r#"L402 macaroon="YWJjZGVm", invoice="lnbc100n1pj9nr7mpp5test", address="bc1qtest""#;
         let challenge = L402Challenge::from_header(header).unwrap();
 
         assert_eq!(challenge.address.as_deref(), Some("bc1qtest"));

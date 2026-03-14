@@ -1,12 +1,13 @@
 //! Payment receipts for audit and cost analysis.
 
 use serde::{Deserialize, Serialize};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// A structured receipt for an L402 payment.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Receipt {
-    /// ISO 8601 timestamp of the payment.
-    pub timestamp: String,
+    /// Unix timestamp (seconds) of the payment.
+    pub timestamp: u64,
 
     /// The endpoint that was accessed.
     pub endpoint: String,
@@ -31,7 +32,7 @@ pub struct Receipt {
 }
 
 impl Receipt {
-    /// Create a new receipt.
+    /// Create a new receipt with the current timestamp.
     pub fn new(
         endpoint: String,
         amount_sats: u64,
@@ -41,7 +42,10 @@ impl Receipt {
         response_status: u16,
         latency_ms: u64,
     ) -> Self {
-        let timestamp = chrono::Utc::now().to_rfc3339();
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before UNIX epoch")
+            .as_secs();
 
         Self {
             timestamp,
@@ -58,5 +62,26 @@ impl Receipt {
     /// Get the total cost (amount + routing fee) in satoshis.
     pub fn total_cost_sats(&self) -> u64 {
         self.amount_sats + self.fee_sats
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn total_cost() {
+        let receipt = Receipt::new(
+            "https://api.example.com".to_string(),
+            100,
+            5,
+            "abc123".to_string(),
+            "def456".to_string(),
+            200,
+            450,
+        );
+
+        assert_eq!(receipt.total_cost_sats(), 105);
+        assert!(receipt.timestamp > 0);
     }
 }

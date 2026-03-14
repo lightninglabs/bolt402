@@ -7,33 +7,26 @@
 //!
 //! This crate follows hexagonal (ports & adapters) architecture:
 //!
-//! - **Domain**: Core types and business logic ([`L402Client`], [`Budget`], [`Receipt`])
-//! - **Ports**: Trait definitions for external dependencies ([`LnBackend`], [`TokenStore`])
+//! - **Domain**: Core types and business logic ([`budget::Budget`], [`receipt::Receipt`])
+//! - **Ports**: Trait definitions for external dependencies ([`LnBackend`], [`port::TokenStore`])
 //! - **Adapters**: In-memory implementations (see [`cache`] and [`budget`] modules)
 //!
 //! External adapters (LND, CLN, etc.) live in separate crates.
-//!
-//! ## Quick Start
-//!
-//! ```rust,no_run
-//! use bolt402_core::{L402Client, L402ClientConfig};
-//!
-//! # async fn example(backend: impl bolt402_core::port::LnBackend) {
-//! let client = L402Client::builder()
-//!     .backend(backend)
-//!     .build();
-//!
-//! let response = client.get("https://api.example.com/paid-resource").await.unwrap();
-//! # }
-//! ```
 
+/// Budget tracking for L402 payments with per-request, hourly, daily, and total limits.
 pub mod budget;
+
+/// In-memory LRU token cache.
 pub mod cache;
-pub mod client;
+
+/// Client error types.
 pub mod error;
+
+/// Port definitions (traits) for Lightning backends and token stores.
 pub mod port;
+
+/// Payment receipt types for audit and cost analysis.
 pub mod receipt;
 
-pub use client::{L402Client, L402ClientBuilder, L402ClientConfig};
 pub use error::ClientError;
 pub use port::LnBackend;

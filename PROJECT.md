@@ -1,4 +1,4 @@
-# bolt402 — Project Brief
+# bolt402 Project Brief
 
 ## Origin
 
@@ -30,7 +30,15 @@ Renamed from `lnpay` (name already taken by other projects). Full original propo
 - **Rust workspace** with hexagonal/clean architecture
 - Crates: `bolt402-proto`, `bolt402-core`, `bolt402-lnd`, `bolt402-mock`
 - Future: FFI bindings (PyO3, napi-rs, cgo, wasm-pack)
-- Autonomous project — Toshi as maintainer, Dario as manager/reviewer
+- Autonomous project. Toshi as maintainer, Dario as manager/reviewer
+
+## Workflow
+
+- Use GitHub Issues as the backlog. Create issues for upcoming work.
+- Pick issues from the backlog, implement on feature branches, open PRs.
+- PRs require CI green + review. Squash merge only.
+- Track progress here and in GitHub Issues/Projects.
+- Maintain: CONTRIBUTING.md, issue templates, CHANGELOG.md (eventually).
 
 ## Status
 
@@ -38,11 +46,13 @@ Renamed from `lnpay` (name already taken by other projects). Full original propo
 - [x] Workspace scaffold created
 - [x] bolt402-proto: L402 challenge parsing, token construction, error types
 - [x] bolt402-core: LnBackend/TokenStore ports, budget tracker, in-memory cache, receipt logger, error types
-- [ ] bolt402-core: L402Client (client.rs not yet created)
+- [x] GitHub repository created (github.com/bitcoin-numeraire/bolt402)
+- [x] AGENTS.md, CLAUDE.md, README.md at repo root
+- [x] Daily cron job (bolt402-development, 14:00 UTC)
+- [ ] **BLOCKED**: Signed commits required by repo ruleset, no GPG in container
+- [ ] bolt402-core: L402Client (client.rs, the core engine)
 - [ ] bolt402-lnd: LND gRPC backend adapter
 - [ ] bolt402-mock: Mock L402 server for testing
-- [ ] GitHub repository created
-- [ ] CI/CD pipeline
-- [ ] AGENTS.md / CLAUDE.md at repo root
-- [ ] Cron job for maintenance
-- [ ] README, docs, tutorials
+- [ ] CI/CD pipeline (GitHub Actions: fmt, clippy, test, doc)
+- [ ] CONTRIBUTING.md, issue templates, CHANGELOG.md
+- [ ] Comprehensive documentation and tutorials

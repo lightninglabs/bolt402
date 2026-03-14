@@ -1,6 +1,6 @@
 # bolt402
 
-**L402 client SDK for AI agent frameworks** — pay for APIs with Lightning.
+**L402 client SDK for AI agent frameworks**. Pay for APIs with Lightning.
 
 > ⚠️ **Work in progress.** bolt402 is under active development. APIs will change.
 
@@ -8,7 +8,7 @@
 
 bolt402 is a Rust-native L402 client SDK that gives AI agent frameworks (LangChain, Vercel AI SDK, CrewAI, etc.) native Lightning payment capabilities. Built once in Rust, distributed everywhere via language bindings.
 
-**The gap today:** Lightning Labs' [agent-kit](https://github.com/lightninglabs/agent-kit) provides `lnget` — a CLI tool for L402 payments. Great for shell-based agents, but the AI agent ecosystem is library-based. LangChain has 200M+ monthly PyPI downloads. None of these frameworks can shell out to `lnget`. They need a native library.
+**The gap today:** Lightning Labs' [agent-kit](https://github.com/lightninglabs/agent-kit) provides `lnget`, a CLI tool for L402 payments. Great for shell-based agents, but the AI agent ecosystem is library-based. LangChain has 200M+ monthly PyPI downloads. None of these frameworks can shell out to `lnget`. They need a native library.
 
 bolt402 fills that gap.
 
@@ -111,4 +111,4 @@ at your option.
 
 ## Contributing
 
-This project is maintained by [@darioAnongba](https://github.com/darioAnongba). Contributions welcome — please open an issue first to discuss.
+This project is maintained by [@darioAnongba](https://github.com/darioAnongba). Contributions welcome. Please open an issue first to discuss.

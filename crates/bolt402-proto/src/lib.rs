@@ -24,16 +24,22 @@
 //! use bolt402_proto::{L402Challenge, L402Token};
 //!
 //! // Parse a challenge from a 402 response header
-//! let header = r#"L402 macaroon="AGIAJEemVQUTEyNCR0exk7ek90Cg==", invoice="lnbc100n1...""#;
+//! let header = r#"L402 macaroon="YWJjZGVm", invoice="lnbc100n1pj9nr7mpp5test""#;
 //! let challenge = L402Challenge::from_header(header).unwrap();
 //!
 //! // After paying the invoice and obtaining the preimage:
 //! let token = L402Token::new(challenge.macaroon.clone(), "abcdef1234567890".to_string());
 //! let auth_header = token.to_header_value();
+//! assert_eq!(auth_header, "L402 YWJjZGVm:abcdef1234567890");
 //! ```
 
+/// L402 challenge parsing from `WWW-Authenticate` headers.
 pub mod challenge;
+
+/// Protocol-level error types.
 pub mod error;
+
+/// L402 authorization token construction and parsing.
 pub mod token;
 
 pub use challenge::L402Challenge;

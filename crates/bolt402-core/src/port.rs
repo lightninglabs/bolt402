@@ -72,8 +72,7 @@ pub trait LnBackend: Send + Sync {
 #[async_trait]
 pub trait TokenStore: Send + Sync {
     /// Store a token for a given endpoint.
-    async fn put(&self, endpoint: &str, macaroon: &str, preimage: &str)
-        -> Result<(), ClientError>;
+    async fn put(&self, endpoint: &str, macaroon: &str, preimage: &str) -> Result<(), ClientError>;
 
     /// Retrieve a cached token for an endpoint, if one exists and is still valid.
     async fn get(&self, endpoint: &str) -> Result<Option<(String, String)>, ClientError>;

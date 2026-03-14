@@ -27,10 +27,7 @@ impl L402Token {
     /// * `macaroon` - Base64-encoded macaroon from the L402 challenge
     /// * `preimage` - Hex-encoded payment preimage from paying the invoice
     pub fn new(macaroon: String, preimage: String) -> Self {
-        Self {
-            macaroon,
-            preimage,
-        }
+        Self { macaroon, preimage }
     }
 
     /// Format the token as an `Authorization` header value.

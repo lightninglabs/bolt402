@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
@@ -70,9 +70,9 @@ pub struct BudgetTracker {
 
 #[derive(Debug)]
 struct BudgetState {
-    total_spent: u64,
-    hourly_spent: HashMap<u64, u64>,  // hour_timestamp -> amount
-    daily_spent: HashMap<u64, u64>,   // day_timestamp -> amount
+    total: u64,
+    hourly: HashMap<u64, u64>, // hour_timestamp -> amount
+    daily: HashMap<u64, u64>,  // day_timestamp -> amount
 }
 
 impl BudgetTracker {
@@ -81,15 +81,19 @@ impl BudgetTracker {
         Self {
             budget,
             state: Arc::new(RwLock::new(BudgetState {
-                total_spent: 0,
-                hourly_spent: HashMap::new(),
-                daily_spent: HashMap::new(),
+                total: 0,
+                hourly: HashMap::new(),
+                daily: HashMap::new(),
             })),
         }
     }
 
     /// Check if a payment is allowed and record it if successful.
-    pub async fn check_and_record(&self, amount: u64, domain: Option<&str>) -> Result<(), ClientError> {
+    pub async fn check_and_record(
+        &self,
+        amount: u64,
+        domain: Option<&str>,
+    ) -> Result<(), ClientError> {
         // Apply domain-specific budget if available
         let effective_budget = if let Some(domain) = domain {
             if let Some(domain_budget) = self.budget.domain_budgets.get(domain) {
@@ -107,19 +111,18 @@ impl BudgetTracker {
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .expect("system clock before UNIX epoch")
             .as_secs();
         let current_hour = now / 3600;
         let current_day = now / 86400;
 
         // Check hourly limit
         if let Some(hourly_max) = effective_budget.hourly_max {
-            let hourly_spent = state.hourly_spent.get(&current_hour).copied().unwrap_or(0);
+            let hourly_spent = state.hourly.get(&current_hour).copied().unwrap_or(0);
             if hourly_spent + amount > hourly_max {
                 return Err(ClientError::BudgetExceeded {
                     reason: format!(
-                        "payment of {amount} sats would exceed hourly limit ({} + {} > {})",
-                        hourly_spent, amount, hourly_max
+                        "payment of {amount} sats would exceed hourly limit ({hourly_spent} + {amount} > {hourly_max})"
                     ),
                 });
             }
@@ -127,12 +130,11 @@ impl BudgetTracker {
 
         // Check daily limit
         if let Some(daily_max) = effective_budget.daily_max {
-            let daily_spent = state.daily_spent.get(&current_day).copied().unwrap_or(0);
+            let daily_spent = state.daily.get(&current_day).copied().unwrap_or(0);
             if daily_spent + amount > daily_max {
                 return Err(ClientError::BudgetExceeded {
                     reason: format!(
-                        "payment of {amount} sats would exceed daily limit ({} + {} > {})",
-                        daily_spent, amount, daily_max
+                        "payment of {amount} sats would exceed daily limit ({daily_spent} + {amount} > {daily_max})"
                     ),
                 });
             }
@@ -140,33 +142,33 @@ impl BudgetTracker {
 
         // Check total limit
         if let Some(total_max) = effective_budget.total_max {
-            if state.total_spent + amount > total_max {
+            let total_spent = state.total;
+            if total_spent + amount > total_max {
                 return Err(ClientError::BudgetExceeded {
                     reason: format!(
-                        "payment of {amount} sats would exceed total limit ({} + {} > {})",
-                        state.total_spent, amount, total_max
+                        "payment of {amount} sats would exceed total limit ({total_spent} + {amount} > {total_max})"
                     ),
                 });
             }
         }
 
         // Record the spending
-        state.total_spent += amount;
-        *state.hourly_spent.entry(current_hour).or_insert(0) += amount;
-        *state.daily_spent.entry(current_day).or_insert(0) += amount;
+        state.total += amount;
+        *state.hourly.entry(current_hour).or_insert(0) += amount;
+        *state.daily.entry(current_day).or_insert(0) += amount;
 
         // Clean up old entries (older than 48 hours)
         let cutoff_hour = current_hour.saturating_sub(48);
-        state.hourly_spent.retain(|&k, _| k >= cutoff_hour);
+        state.hourly.retain(|&k, _| k >= cutoff_hour);
         let cutoff_day = current_day.saturating_sub(2);
-        state.daily_spent.retain(|&k, _| k >= cutoff_day);
+        state.daily.retain(|&k, _| k >= cutoff_day);
 
         Ok(())
     }
 
     /// Get the total amount spent so far.
     pub async fn total_spent(&self) -> u64 {
-        self.state.read().await.total_spent
+        self.state.read().await.total
     }
 }
 
