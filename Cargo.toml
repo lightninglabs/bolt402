@@ -1,0 +1,62 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/bolt402-proto",
+    "crates/bolt402-core",
+    "crates/bolt402-lnd",
+    "crates/bolt402-mock",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/bitcoin-numeraire/bolt402"
+homepage = "https://github.com/bitcoin-numeraire/bolt402"
+documentation = "https://docs.rs/bolt402-core"
+rust-version = "1.85"
+authors = ["Dario Anongba Varela <dario.anongba@gmail.com>"]
+
+[workspace.dependencies]
+# Internal crates
+bolt402-proto = { path = "crates/bolt402-proto" }
+bolt402-core = { path = "crates/bolt402-core" }
+bolt402-lnd = { path = "crates/bolt402-lnd" }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# HTTP
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+http = "1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Macaroons
+macaroon = "0.3"
+
+# Lightning / gRPC
+tonic = "0.12"
+prost = "0.13"
+
+# Crypto
+hex = "0.4"
+base64 = "0.22"
+sha2 = "0.10"
+
+# Async traits
+async-trait = "0.1"
+
+# Testing
+mockall = "0.13"
+wiremock = "0.6"

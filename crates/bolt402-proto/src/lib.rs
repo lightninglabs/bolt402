@@ -1,0 +1,41 @@
+//! # bolt402-proto
+//!
+//! L402 protocol types, challenge parsing, and token construction.
+//!
+//! This crate provides the foundational types for the L402 protocol:
+//! - [`L402Challenge`]: Parsed `WWW-Authenticate` header from a 402 response
+//! - [`L402Token`]: Authorization token (macaroon + preimage) for authenticated requests
+//! - [`L402Error`]: Protocol-level errors
+//!
+//! ## L402 Protocol Overview
+//!
+//! L402 (formerly LSAT) is an HTTP 402-based authentication protocol that uses
+//! Lightning Network payments and macaroons for API access control:
+//!
+//! 1. Client sends a request to a protected resource
+//! 2. Server responds with `HTTP 402` and a `WWW-Authenticate: L402` header
+//! 3. Client pays the Lightning invoice from the challenge
+//! 4. Client constructs an `Authorization: L402 <macaroon>:<preimage>` header
+//! 5. Client retries the request with the authorization header
+//!
+//! ## Example
+//!
+//! ```rust
+//! use bolt402_proto::{L402Challenge, L402Token};
+//!
+//! // Parse a challenge from a 402 response header
+//! let header = r#"L402 macaroon="AGIAJEemVQUTEyNCR0exk7ek90Cg==", invoice="lnbc100n1...""#;
+//! let challenge = L402Challenge::from_header(header).unwrap();
+//!
+//! // After paying the invoice and obtaining the preimage:
+//! let token = L402Token::new(challenge.macaroon.clone(), "abcdef1234567890".to_string());
+//! let auth_header = token.to_header_value();
+//! ```
+
+pub mod challenge;
+pub mod error;
+pub mod token;
+
+pub use challenge::L402Challenge;
+pub use error::L402Error;
+pub use token::L402Token;

@@ -1,0 +1,22 @@
+[package]
+name = "bolt402-proto"
+description = "L402 protocol types, macaroon handling, and shared types for Lightning-gated HTTP"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+categories = ["authentication", "cryptography", "web-programming"]
+keywords = ["l402", "lightning", "macaroon", "bitcoin", "protocol"]
+
+[dependencies]
+base64 = { workspace = true }
+hex = { workspace = true }
+http = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
