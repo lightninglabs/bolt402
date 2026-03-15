@@ -51,9 +51,11 @@ Renamed from `lnpay` (name already taken by other projects). Full original propo
 - [x] Daily cron job (bolt402-development, 14:00 UTC)
 - [x] CI/CD pipeline (GitHub Actions: fmt, clippy, test, doc) — PR #1
 - [x] bolt402-core: L402Client (client.rs, the core engine) — PR #6
-- [ ] bolt402-lnd: LND gRPC backend adapter — Issue #4
+- [x] bolt402-lnd: LND gRPC backend adapter — Issue #4
 - [x] bolt402-mock: Mock L402 server for testing — PR #9
 - [x] Integration tests using bolt402-mock — Issue #5 / PR #12
+- [x] bolt402-swissknife: SwissKnife REST API backend adapter — Issue #7 / PR #13
+- [ ] Vercel AI SDK integration — Issue #8
 - [ ] CONTRIBUTING.md, issue templates, CHANGELOG.md
 - [ ] Comprehensive documentation and tutorials
 
