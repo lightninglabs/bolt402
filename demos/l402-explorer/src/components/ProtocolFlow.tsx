@@ -34,13 +34,11 @@ const INITIAL_STEPS: FlowStep[] = [
 export default function ProtocolFlow({ service, onClose, onSpend }: ProtocolFlowProps) {
   const [steps, setSteps] = useState<FlowStep[]>(INITIAL_STEPS);
   const [running, setRunning] = useState(false);
-  const [challenge, setChallenge] = useState<{ macaroon: string; invoice: string } | null>(null);
   const [responseBody, setResponseBody] = useState<string | null>(null);
 
   const runFlow = useCallback(async () => {
     setRunning(true);
     setSteps(INITIAL_STEPS);
-    setChallenge(null);
     setResponseBody(null);
 
     // Step 1: Initial Request — activate
@@ -73,61 +71,35 @@ export default function ProtocolFlow({ service, onClose, onSpend }: ProtocolFlow
       );
       await new Promise((r) => setTimeout(r, 400));
 
-      if (data.status === 402 && data.challenge) {
-        // Got a 402 challenge
-        setChallenge(data.challenge);
+      if (data.error) {
+        // Server-side error (network, parse, etc.)
+        setSteps((s) =>
+          s.map((step) => {
+            const serverStep = data.steps?.find((ds: FlowStep) => ds.id === step.id);
+            return serverStep || step;
+          }),
+        );
+      } else if (data.steps) {
+        // Server returned completed steps — use them directly
+        setSteps(data.steps.map((s: FlowStep) => ({
+          id: s.id,
+          label: s.label,
+          status: s.status as FlowStep['status'],
+          detail: s.detail,
+        })));
 
-        setSteps((s) =>
-          s.map((step) => {
-            if (step.id === 'challenge')
-              return {
-                ...step,
-                status: 'complete',
-                detail: `Macaroon: ${data.challenge.macaroon}\nInvoice: ${data.challenge.invoice}`,
-              };
-            if (step.id === 'payment')
-              return {
-                ...step,
-                status: 'error',
-                detail: 'Payment backend not configured. Connect LND or SwissKnife to complete the flow.',
-              };
-            return step;
-          }),
-        );
-      } else if (data.status !== 402) {
-        // No payment required — service returned directly
-        setSteps((s) =>
-          s.map((step) => {
-            if (step.id === 'challenge')
-              return { ...step, status: 'complete', detail: 'No payment required (non-402 response)' };
-            if (step.id === 'payment')
-              return { ...step, status: 'complete', detail: 'Skipped — free endpoint' };
-            if (step.id === 'retry')
-              return { ...step, status: 'complete', detail: 'Skipped' };
-            if (step.id === 'response')
-              return { ...step, status: 'complete', detail: `Status ${data.status}` };
-            return step;
-          }),
-        );
-        setResponseBody(typeof data.body === 'string' ? data.body.slice(0, 500) : JSON.stringify(data.body).slice(0, 500));
+        if (data.body) {
+          setResponseBody(typeof data.body === 'string' ? data.body.slice(0, 2000) : JSON.stringify(data.body).slice(0, 2000));
+        }
 
         onSpend({
           service: service.name,
           url: service.url,
-          amountSats: 0,
-          feeSats: 0,
+          amountSats: data.receipt?.amountSats ?? 0,
+          feeSats: data.receipt?.feeSats ?? 0,
           latencyMs,
           status: data.status,
         });
-      } else {
-        // 402 but no parseable challenge
-        setSteps((s) =>
-          s.map((step) => {
-            if (step.id === 'challenge')
-              return { ...step, status: 'error', detail: data.error || 'Could not parse challenge' };
-            return step;
-          }),
-        );
       }
     } catch (err) {
       setSteps((s) =>
@@ -209,33 +181,20 @@ export default function ProtocolFlow({ service, onClose, onSpend }: ProtocolFlow
           ))}
         </div>
 
-        {/* Challenge details */}
-        {challenge && (
-          <div className="mx-6 mb-4 rounded-lg bg-zinc-900 border border-zinc-800 p-4">
-            <h3 className="text-xs font-semibold text-[#F7931A] mb-2 uppercase tracking-wider">
-              Challenge Details
-            </h3>
-            <div className="space-y-2 text-xs font-mono">
-              <div>
-                <span className="text-zinc-500">Macaroon: </span>
-                <span className="text-zinc-300">{challenge.macaroon}</span>
-              </div>
-              <div>
-                <span className="text-zinc-500">Invoice: </span>
-                <span className="text-zinc-300">{challenge.invoice}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Response preview */}
         {responseBody && (
           <div className="mx-6 mb-4 rounded-lg bg-zinc-900 border border-zinc-800 p-4">
             <h3 className="text-xs font-semibold text-emerald-400 mb-2 uppercase tracking-wider">
               Response Preview
             </h3>
-            <pre className="text-xs font-mono text-zinc-400 whitespace-pre-wrap break-all max-h-32 overflow-y-auto">
-              {responseBody}
+            <pre className="text-xs font-mono text-zinc-400 whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
+              {(() => {
+                try {
+                  return JSON.stringify(JSON.parse(responseBody), null, 2);
+                } catch {
+                  return responseBody;
+                }
+              })()}
             </pre>
           </div>
         )}

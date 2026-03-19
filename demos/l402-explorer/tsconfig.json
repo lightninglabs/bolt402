@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "bolt402-ai-sdk": ["../../packages/bolt402-ai-sdk/src/index.ts"]
     }
   },
   "include": [

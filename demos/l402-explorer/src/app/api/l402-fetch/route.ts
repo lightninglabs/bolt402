@@ -1,14 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  L402Client,
+  LndBackend,
+  SwissKnifeBackend,
+  type LnBackend,
+} from '@/lib/bolt402';
+import { MockBackend } from '@/lib/mock-backend';
+
+function createBackend(): LnBackend {
+  const backendType = process.env.BACKEND_TYPE || 'mock';
+
+  if (backendType === 'lnd' && process.env.LND_URL && process.env.LND_MACAROON) {
+    return new LndBackend({
+      url: process.env.LND_URL,
+      macaroon: process.env.LND_MACAROON,
+    });
+  }
+
+  if (
+    backendType === 'swissknife' &&
+    process.env.SWISSKNIFE_URL &&
+    process.env.SWISSKNIFE_API_KEY
+  ) {
+    return new SwissKnifeBackend({
+      url: process.env.SWISSKNIFE_URL,
+      apiKey: process.env.SWISSKNIFE_API_KEY,
+    });
+  }
+
+  return new MockBackend();
+}
 
 /**
- * API route that proxies L402 requests through the server.
+ * API route that performs a full L402 flow server-side.
  *
- * The browser can't talk to LND directly (gRPC/macaroon auth),
- * so this route handles the L402 flow server-side and returns results.
- *
- * In a real deployment, this would use bolt402-ai-sdk with a configured
- * LND or SwissKnife backend. For the demo, we simulate the protocol
- * flow with the mock server or forward to real L402 endpoints.
+ * Uses the same L402Client + configured backend as the AI chat,
+ * so it can actually pay invoices (real or mock) and return data.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -18,115 +45,117 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing url' }, { status: 400 });
     }
 
-    const startTime = Date.now();
-
-    // Step 1: Make the initial request
-    const initialRes = await fetch(url, {
-      method,
-      headers: { 'User-Agent': 'bolt402-l402-explorer/0.1.0' },
+    const backend = createBackend();
+    const client = new L402Client({
+      backend,
+      budget: { perRequestMax: 1000, dailyMax: 50000 },
+      maxFeeSats: 100,
     });
 
-    // If not 402, return directly
-    if (initialRes.status !== 402) {
-      const body = await initialRes.text();
-      return NextResponse.json({
-        url,
-        status: initialRes.status,
-        body,
-        paid: false,
-        receipt: null,
-        steps: [
-          {
-            id: 'request',
-            label: 'HTTP Request',
-            status: 'complete',
-            detail: `${method} ${url}`,
-          },
-          {
-            id: 'response',
-            label: 'Response',
-            status: 'complete',
-            detail: `${initialRes.status} — no payment required`,
-          },
-        ],
-      });
-    }
-
-    // Step 2: Parse the L402 challenge
-    const wwwAuth = initialRes.headers.get('www-authenticate');
-    if (!wwwAuth) {
-      return NextResponse.json({
-        url,
-        status: 402,
-        body: 'Server returned 402 but no WWW-Authenticate header',
-        paid: false,
-        receipt: null,
-        error: 'Missing WWW-Authenticate header',
-        steps: [
-          { id: 'request', label: 'HTTP Request', status: 'complete', detail: `${method} ${url}` },
-          { id: 'challenge', label: '402 Challenge', status: 'error', detail: 'No WWW-Authenticate header' },
-        ],
-      });
-    }
-
-    const macaroonMatch = /macaroon="([^"]+)"/.exec(wwwAuth);
-    const invoiceMatch = /invoice="([^"]+)"/.exec(wwwAuth);
-
-    if (!macaroonMatch || !invoiceMatch) {
-      return NextResponse.json({
-        url,
-        status: 402,
-        body: 'Failed to parse L402 challenge',
-        paid: false,
-        receipt: null,
-        error: `Unparseable challenge: ${wwwAuth.substring(0, 100)}`,
-        steps: [
-          { id: 'request', label: 'HTTP Request', status: 'complete', detail: `${method} ${url}` },
-          { id: 'challenge', label: '402 Challenge', status: 'error', detail: 'Malformed challenge header' },
-        ],
-      });
-    }
-
-    const macaroon = macaroonMatch[1];
-    const invoice = invoiceMatch[1];
-
-    // Step 3: Pay the invoice via configured backend
-    // TODO: Integrate bolt402-ai-sdk with real LND/SwissKnife backend
-    // For now, return the challenge details so the frontend can visualize the flow
+    const startTime = Date.now();
+    const response = await client.fetch(url, { method });
     const latencyMs = Date.now() - startTime;
+
+    // Try to pretty-format JSON bodies
+    let body = response.body;
+    try {
+      body = JSON.stringify(JSON.parse(body), null, 2);
+    } catch {
+      // Not JSON, keep as-is
+    }
+
+    const steps = [];
+    steps.push({
+      id: 'request',
+      label: 'HTTP Request',
+      status: 'complete',
+      detail: `${method} ${url}`,
+    });
+
+    if (response.paid && response.receipt) {
+      steps.push({
+        id: 'challenge',
+        label: '402 Payment Required',
+        status: 'complete',
+        detail: `Invoice paid: ${response.receipt.amountSats} sats + ${response.receipt.feeSats} sats fee`,
+      });
+      steps.push({
+        id: 'payment',
+        label: 'Lightning Payment',
+        status: 'complete',
+        detail: `Hash: ${response.receipt.paymentHash.substring(0, 20)}... (${response.receipt.latencyMs}ms)`,
+      });
+      steps.push({
+        id: 'retry',
+        label: 'Retry with Token',
+        status: 'complete',
+        detail: 'Authorization: L402 <macaroon>:<preimage>',
+      });
+      steps.push({
+        id: 'response',
+        label: 'Response Data',
+        status: 'complete',
+        detail: `Status ${response.status} — ${body.length} bytes`,
+      });
+    } else {
+      steps.push({
+        id: 'challenge',
+        label: '402 Challenge',
+        status: 'complete',
+        detail: 'No payment required (non-402 response)',
+      });
+      steps.push({
+        id: 'payment',
+        label: 'Lightning Payment',
+        status: 'complete',
+        detail: 'Skipped — free endpoint',
+      });
+      steps.push({
+        id: 'retry',
+        label: 'Retry with Token',
+        status: 'complete',
+        detail: 'Skipped',
+      });
+      steps.push({
+        id: 'response',
+        label: 'Response Data',
+        status: 'complete',
+        detail: `Status ${response.status}`,
+      });
+    }
 
     return NextResponse.json({
       url,
-      status: 402,
-      body: 'Payment required — backend not configured',
-      paid: false,
-      receipt: null,
-      challenge: {
-        macaroon: macaroon.substring(0, 20) + '...',
-        invoice: invoice.substring(0, 40) + '...',
-        invoiceFull: invoice,
-      },
-      steps: [
-        { id: 'request', label: 'HTTP Request', status: 'complete', detail: `${method} ${url}` },
-        {
-          id: 'challenge',
-          label: '402 Payment Required',
-          status: 'complete',
-          detail: `Invoice: ${invoice.substring(0, 30)}...`,
-        },
-        {
-          id: 'payment',
-          label: 'Lightning Payment',
-          status: 'pending',
-          detail: 'Configure LND or SwissKnife backend to enable payments',
-        },
-      ],
+      status: response.status,
+      body,
+      paid: response.paid,
+      receipt: response.receipt
+        ? {
+            amountSats: response.receipt.amountSats,
+            feeSats: response.receipt.feeSats,
+            totalCostSats: response.receipt.totalCostSats,
+            paymentHash: response.receipt.paymentHash,
+            latencyMs: response.receipt.latencyMs,
+          }
+        : null,
+      steps,
       latencyMs,
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 },
+      {
+        url: '',
+        status: 0,
+        body: '',
+        paid: false,
+        receipt: null,
+        error: message,
+        steps: [
+          { id: 'request', label: 'HTTP Request', status: 'error', detail: message },
+        ],
+      },
+      { status: 200 }, // Return 200 so frontend can display the error steps
     );
   }
 }
