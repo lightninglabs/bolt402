@@ -1068,12 +1068,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:^20":
-  version: 20.19.37
-  resolution: "@types/node@npm:20.19.37"
+"@types/node@npm:^22":
+  version: 22.19.15
+  resolution: "@types/node@npm:22.19.15"
   dependencies:
     undici-types: "npm:~6.21.0"
-  checksum: 10c0/8420353aee776ae5c1e9720058949909a0e908fa2af85501e9db2645bb9f9acd7d767890f8aaee34d375e6f8b5f550a9a169e908d2d8cf7d5daf63dce64092a0
+  checksum: 10c0/f17eaf3d0d1da5e93ad9e287efb78201f8a5282973c004c5f70d91675c5c6b926a23acaa7b158a42b3d7e27e36b349d65a531710c91c308fca53dd7fa280ef98
   languageName: node
   linkType: hard
 
@@ -1615,11 +1615,11 @@ __metadata:
 
 "bolt402-ai-sdk@file:../../packages/bolt402-ai-sdk::locator=l402-explorer%40workspace%3A.":
   version: 0.1.0
-  resolution: "bolt402-ai-sdk@file:../../packages/bolt402-ai-sdk#../../packages/bolt402-ai-sdk::hash=44748b&locator=l402-explorer%40workspace%3A."
+  resolution: "bolt402-ai-sdk@file:../../packages/bolt402-ai-sdk#../../packages/bolt402-ai-sdk::hash=7d3adb&locator=l402-explorer%40workspace%3A."
   peerDependencies:
-    ai: ">=4.0.0"
-    zod: ">=3.0.0"
-  checksum: 10c0/ef94d6227140b1f9c46181705b235fc113a0bdc2d24cd23ad4af5a014863c880be4e36c887e5c6a6cd6efa7d66c636978caa1cafa53ef41df200931b7814e38f
+    ai: ">=6.0.0"
+    zod: ^3.25.76 || ^4.1.8
+  checksum: 10c0/2d678d580b5811a57289513b9b6e99132457137dd4559c78507b74a72930008e87ddafe6cc8238daf966d696130c8e5ca335ee42d4727f1d8c9ba662b8f53ad2
   languageName: node
   linkType: hard
 
@@ -3136,7 +3136,7 @@ __metadata:
     "@ai-sdk/react": "npm:3.0.118"
     "@ai-sdk/xai": "npm:3.0.67"
     "@tailwindcss/postcss": "npm:^4"
-    "@types/node": "npm:^20"
+    "@types/node": "npm:^22"
     "@types/react": "npm:^19"
     "@types/react-dom": "npm:^19"
     ai: "npm:6.0.116"
@@ -3148,7 +3148,7 @@ __metadata:
     react-dom: "npm:19.2.4"
     tailwindcss: "npm:^4"
     typescript: "npm:^5"
-    zod: "npm:^3.24.0"
+    zod: "npm:^3.25.76"
   languageName: unknown
   linkType: soft
 
@@ -4681,16 +4681,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"zod@npm:^3.24.0":
-  version: 3.25.76
-  resolution: "zod@npm:3.25.76"
-  checksum: 10c0/5718ec35e3c40b600316c5b4c5e4976f7fee68151bc8f8d90ec18a469be9571f072e1bbaace10f1e85cf8892ea12d90821b200e980ab46916a6166a4260a983c
-  languageName: node
-  linkType: hard
-
 "zod@npm:^3.25.0 || ^4.0.0":
   version: 4.3.6
   resolution: "zod@npm:4.3.6"
   checksum: 10c0/860d25a81ab41d33aa25f8d0d07b091a04acb426e605f396227a796e9e800c44723ed96d0f53a512b57be3d1520f45bf69c0cb3b378a232a00787a2609625307
+  languageName: node
+  linkType: hard
+
+"zod@npm:^3.25.76":
+  version: 3.25.76
+  resolution: "zod@npm:3.25.76"
+  checksum: 10c0/5718ec35e3c40b600316c5b4c5e4976f7fee68151bc8f8d90ec18a469be9571f072e1bbaace10f1e85cf8892ea12d90821b200e980ab46916a6166a4260a983c
   languageName: node
   linkType: hard

@@ -26,7 +26,7 @@ LND_MACAROON=hex-encoded-admin-macaroon
 ## Run
 
 ```bash
-npx tsx index.ts
+yarn start
 ```
 
 ## What It Does

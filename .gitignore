@@ -25,3 +25,8 @@ dist/
 # TypeScript packages
 packages/*/node_modules/
 packages/*/dist/
+
+# Examples
+examples/*/node_modules/
+examples/*/.yarn/
+examples/*/.pnp.*

@@ -74,7 +74,7 @@ export function createBolt402Tools(config: Bolt402ToolsConfig) {
         'When the server requires payment (HTTP 402), this tool pays the Lightning invoice, ' +
         'caches the token, and retries the request. Returns the response body and payment ' +
         'receipt if a payment was made. Use this for any API that requires L402 authentication.',
-      parameters: z.object({
+      inputSchema: z.object({
         url: z.string().url().describe('The URL to fetch'),
         method: z
           .enum(['GET', 'POST', 'PUT', 'DELETE'])
@@ -113,7 +113,7 @@ export function createBolt402Tools(config: Bolt402ToolsConfig) {
       description:
         'Get the current Lightning node balance in satoshis. ' +
         'Use this to check available funds before making L402 payments.',
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         const balance = await backend.getBalance();
         const info = await backend.getInfo();
@@ -129,7 +129,7 @@ export function createBolt402Tools(config: Bolt402ToolsConfig) {
       description:
         'Get all L402 payment receipts from this session. ' +
         'Useful for tracking costs, auditing payments, and reporting spend to the user.',
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         const receipts = client.getReceipts();
         const totalSpent = client.getTotalSpent();

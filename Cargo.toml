@@ -58,7 +58,7 @@ bolt402-swissknife = { path = "crates/bolt402-swissknife" }
 tokio = { version = "1", features = ["full"] }
 
 # HTTP
-reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+reqwest = { version = "0.13", features = ["json", "rustls"], default-features = false }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -87,5 +87,5 @@ pyo3 = { version = "0.28", features = ["extension-module"] }
 async-trait = "0.1"
 
 # Testing
-mockall = "0.13"
+mockall = "0.14"
 tokio-test = "0.4"

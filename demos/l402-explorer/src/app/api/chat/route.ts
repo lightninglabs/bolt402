@@ -7,9 +7,9 @@ import { xai } from '@ai-sdk/xai';
 import {
   LndBackend,
   SwissKnifeBackend,
+  createBolt402Tools,
   type LnBackend,
 } from 'bolt402-ai-sdk';
-import { createBolt402ToolsV6 } from '@/lib/bolt402-tools';
 import { MockBackend } from '@/lib/mock-backend';
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ export async function POST(req: Request) {
 
     // Get bolt402 payment tools
     const backend = createBackend();
-    const bolt402Tools = createBolt402ToolsV6({
+    const bolt402Tools = createBolt402Tools({
       backend,
       budget: { perRequestMax: 1000, dailyMax: 50000 },
       maxFeeSats: 100,

@@ -7,7 +7,7 @@
  *   OPENAI_API_KEY=sk-... LND_URL=https://... LND_MACAROON=... npx tsx index.ts
  */
 
-import { generateText } from 'ai';
+import { generateText, stepCountIs } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { createBolt402Tools, LndBackend } from 'bolt402-ai-sdk';
 
@@ -46,7 +46,7 @@ async function main() {
     const result = await generateText({
       model: openai('gpt-4o'),
       tools,
-      maxSteps: 5,
+      stopWhen: stepCountIs(5),
       prompt,
     });
 
