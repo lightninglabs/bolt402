@@ -1,16 +1,11 @@
-import { streamText, stepCountIs, convertToModelMessages } from 'ai';
+import { streamText, stepCountIs, convertToModelMessages, jsonSchema } from 'ai';
 import { createMCPClient } from '@ai-sdk/mcp';
 import { Experimental_StdioMCPTransport } from '@ai-sdk/mcp/mcp-stdio';
 import { openai } from '@ai-sdk/openai';
 import { anthropic, createAnthropic } from '@ai-sdk/anthropic';
 import { xai } from '@ai-sdk/xai';
-import {
-  LndBackend,
-  SwissKnifeBackend,
-  createBolt402Tools,
-  type LnBackend,
-} from 'bolt402-ai-sdk';
-import { MockBackend } from '@/lib/mock-backend';
+import { createBolt402Tools } from 'bolt402-ai-sdk';
+import { getSharedL402Client, getSharedBackend } from '@/lib/l402-shared';
 
 // ---------------------------------------------------------------------------
 // 402index MCP client (singleton — reused across requests)
@@ -18,6 +13,7 @@ import { MockBackend } from '@/lib/mock-backend';
 
 let mcpClient: Awaited<ReturnType<typeof createMCPClient>> | null = null;
 let mcpInitPromise: Promise<Awaited<ReturnType<typeof createMCPClient>>> | null = null;
+let cachedCategories: string[] = [];
 
 async function getIndexMCPClient() {
   if (mcpClient) return mcpClient;
@@ -34,6 +30,22 @@ async function getIndexMCPClient() {
       });
       mcpClient = client;
       console.log('[bolt402-chat] 402index MCP client ready');
+
+      // Pre-fetch valid categories so the model knows what exists
+      try {
+        const tools = await client.tools();
+        if (tools.list_categories) {
+          const result = await tools.list_categories.execute({}, { toolCallId: '_init', messages: [] });
+          const parsed = extractMCPText(result);
+          if (parsed?.categories && typeof parsed.categories === 'object') {
+            cachedCategories = Object.keys(parsed.categories);
+            console.log('[bolt402-chat] Cached categories:', cachedCategories.join(', '));
+          }
+        }
+      } catch (err) {
+        console.warn('[bolt402-chat] Failed to pre-fetch categories:', err);
+      }
+
       return client;
     } catch (err) {
       console.error('[bolt402-chat] Failed to init 402index MCP:', err);
@@ -43,6 +55,20 @@ async function getIndexMCPClient() {
   })();
 
   return mcpInitPromise;
+}
+
+/** Extract parsed JSON from an MCP tool result's text content. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractMCPText(result: unknown): any {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const r = result as any;
+  if (r?.content) {
+    const text = r.content.find((c: { type: string }) => c.type === 'text');
+    if (text?.text) {
+      try { return JSON.parse(text.text); } catch { return null; }
+    }
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,66 +124,80 @@ function createModel(provider: Provider, model: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Lightning backend
+// MCP tool schema filtering
 // ---------------------------------------------------------------------------
 
-function createBackend(): LnBackend {
-  const backendType = process.env.BACKEND_TYPE || 'mock';
+/**
+ * Strip optional properties from an MCP tool's JSON Schema so the LLM only
+ * sees the fields we want it to use. Models like gpt-5.4 fill in every
+ * schema property (e.g. source: "discovery", featured: true) which
+ * over-filters search results.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function filterToolSchema(tool: any, allowedProps: string[]): unknown {
+  const schema = tool.inputSchema?.jsonSchema;
+  if (!schema?.properties) return tool;
 
-  if (backendType === 'lnd' && process.env.LND_URL && process.env.LND_MACAROON) {
-    return new LndBackend({
-      url: process.env.LND_URL,
-      macaroon: process.env.LND_MACAROON,
-    });
+  const filteredSchema = {
+    ...schema,
+    properties: Object.fromEntries(
+      Object.entries(schema.properties).filter(([key]: [string, unknown]) => allowedProps.includes(key)),
+    ),
+  };
+
+  if (Array.isArray(filteredSchema.required)) {
+    filteredSchema.required = filteredSchema.required.filter(
+      (r: string) => allowedProps.includes(r),
+    );
   }
 
-  if (
-    backendType === 'swissknife' &&
-    process.env.SWISSKNIFE_URL &&
-    process.env.SWISSKNIFE_API_KEY
-  ) {
-    return new SwissKnifeBackend({
-      url: process.env.SWISSKNIFE_URL,
-      apiKey: process.env.SWISSKNIFE_API_KEY,
-    });
-  }
-
-  return new MockBackend();
+  return {
+    ...tool,
+    inputSchema: jsonSchema(filteredSchema),
+  };
 }
 
 // ---------------------------------------------------------------------------
 // System prompt (no static service list — agent discovers via MCP)
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `You are an AI research assistant powered by bolt402. You help users query L402-gated APIs and pay for them with Lightning Network micropayments.
+function buildSystemPrompt(): string {
+  const categoryList = cachedCategories.length > 0
+    ? `\n\nKnown service categories in the directory: ${cachedCategories.join(', ')}.`
+    : '';
+
+  return `You are an AI research assistant powered by bolt402. You help users query L402-gated APIs and pay for them with Lightning Network micropayments.
 
 ## Your tools
 
 **Discovery (402index MCP):**
-- search_services — Search the 402index directory for L402 APIs by keyword, category, health status, or price. Always filter by protocol "l402".
-- get_service_detail — Get full details and health history for a specific service.
+- search_services — Search the 402index directory for services by keyword.
+- get_service_detail — Get full details for a specific service by ID.
 - list_categories — Browse available API categories.
-- get_directory_stats — Get ecosystem overview (total services, health breakdown).
+- get_directory_stats — Get ecosystem overview.
 
 **Payment (bolt402):**
-- l402_fetch — Fetch any URL, automatically paying Lightning invoices for L402-gated endpoints. This handles the full protocol: request → 402 challenge → pay invoice → retry with token.
-- l402_get_balance — Check Lightning node balance before making payments.
-- l402_get_receipts — Get payment receipts and total spending.
-
+- l402_fetch — Fetch any URL, automatically paying Lightning invoices for L402 endpoints. Handles the full L402 flow.
+- l402_get_balance — Check Lightning node balance.
+- l402_get_receipts — Get payment receipts and spending totals.
+${categoryList}
 ## Workflow
 
 When a user asks a question:
-1. Use search_services to find relevant L402 APIs (filter by protocol "l402", prefer "healthy" services)
-2. Evaluate: check price, health status, and reliability score
-3. Use l402_fetch to call the chosen endpoint and pay with Lightning
-4. Present the data clearly with cost attribution (which API, sats spent, latency)
+1. Use search_services with q (keyword), protocol="L402", and limit=200. The keyword search is fuzzy — use simple, broad terms (e.g. "twitter", "bitcoin price", "weather").
+2. If no results, retry with different keywords: synonyms, shorter terms, or related concepts.
+3. Pick the best service based on health, reliability_score, and latency.
+4. Use l402_fetch to call the chosen endpoint URL and pay with Lightning.
+5. Present the data clearly with cost attribution.
 
-IMPORTANT: Many services list a base URL. You must call the specific endpoint path, not the base URL.
-For example, call https://oracle.neofreight.net/api/price, NOT https://oracle.neofreight.net.
+## Important rules
 
-If you can't find a suitable API, explain what's available and suggest alternatives.
-Always mention the cost of each API call to keep the user informed about spending.
-Format data using markdown for clarity. Extract key information from JSON responses.`;
+- Many services list a base URL. You MUST call the specific endpoint path, not the base URL.
+  Example: call https://oracle.neofreight.net/api/price, NOT https://oracle.neofreight.net.
+- Always mention the cost of each API call.
+- Format responses using markdown.
+- You CAN use l402_fetch on any URL — you don't need to discover it first if the user provides one.`;
+}
 
 // ---------------------------------------------------------------------------
 // Route handler
@@ -165,13 +205,6 @@ Format data using markdown for clarity. Extract key information from JSON respon
 
 export async function POST(req: Request) {
   const { provider, model, apiKeySet } = detectProvider();
-  const backendType = process.env.BACKEND_TYPE || 'mock';
-
-  console.log('[bolt402-chat]', {
-    provider,
-    model,
-    backend: backendType,
-  });
 
   if (!apiKeySet) {
     return new Response(
@@ -186,12 +219,10 @@ export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
 
-    // Get bolt402 payment tools
-    const backend = createBackend();
+    // Get bolt402 payment tools (shared client so receipts persist)
     const bolt402Tools = createBolt402Tools({
-      backend,
-      budget: { perRequestMax: 1000, dailyMax: 50000 },
-      maxFeeSats: 100,
+      client: getSharedL402Client(),
+      backend: getSharedBackend(),
     });
 
     // Get 402index MCP discovery tools (with fallback)
@@ -199,22 +230,35 @@ export async function POST(req: Request) {
     try {
       const client = await getIndexMCPClient();
       indexTools = await client.tools();
-      console.log('[bolt402-chat] MCP tools loaded:', Object.keys(indexTools).join(', '));
+
+      // Strip problematic optional fields from search_services schema.
+      // Models like GPT-5.4 fill in every schema property with guessed
+      // values (e.g. category: "social", health: "healthy") which
+      // over-filters and returns 0 results.
+      // Only expose category if we have valid values to constrain it.
+      if (indexTools.search_services) {
+        indexTools.search_services = filterToolSchema(
+          indexTools.search_services,
+          ['q', 'protocol', 'limit'],
+        );
+      }
     } catch (err) {
       console.warn('[bolt402-chat] MCP unavailable, agent will use bolt402 tools only:', err);
     }
 
     const modelMessages = await convertToModelMessages(messages);
 
+    const allTools = {
+      ...indexTools,
+      ...bolt402Tools,
+    } as Parameters<typeof streamText>[0]['tools'];
+
     const result = streamText({
       model: createModel(provider, model),
-      system: SYSTEM_PROMPT,
+      system: buildSystemPrompt(),
       messages: modelMessages,
-      tools: {
-        ...indexTools,
-        ...bolt402Tools,
-      } as Parameters<typeof streamText>[0]['tools'],
-      stopWhen: stepCountIs(8), // more steps: discover → evaluate → pay → present
+      tools: allTools,
+      stopWhen: stepCountIs(8),
       onError({ error }) {
         console.error('[bolt402-chat] Stream error:', error);
       },

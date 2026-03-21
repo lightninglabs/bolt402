@@ -54,35 +54,61 @@ export class LndBackend implements LnBackend {
       throw new Error(`LND payment failed (${response.status}): ${errorText}`);
     }
 
-    // v2/router/send returns newline-delimited JSON stream
-    // The final message contains the payment result
+    // v2/router/send returns newline-delimited JSON stream.
+    // Each line is a JSON object. We scan from the last line backward
+    // to find the final payment update (SUCCEEDED or FAILED).
     const text = await response.text();
-    const lines = text.trim().split('\n');
-    const lastLine = lines[lines.length - 1];
-    const result = JSON.parse(lastLine) as {
-      result?: {
-        status?: string;
-        payment_preimage?: string;
-        payment_hash?: string;
-        value_sat?: string;
-        fee_sat?: string;
-        failure_reason?: string;
-      };
-    };
+    const lines = text.trim().split('\n').filter((l) => l.trim());
 
-    if (!result.result || result.result.status !== 'SUCCEEDED') {
-      const reason = result.result?.failure_reason ?? 'unknown';
+    // Find the SUCCEEDED payment in the stream (scan from end)
+    let payment: LndPaymentResult | null = null;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const parsed = JSON.parse(lines[i]) as { result?: LndPaymentResult } & LndPaymentResult;
+      // Handle both wrapped {"result": {...}} and unwrapped {...} formats
+      const candidate = parsed.result ?? parsed;
+      if (candidate.status === 'SUCCEEDED') {
+        payment = candidate;
+        break;
+      }
+    }
+
+    if (!payment) {
+      // Try to find a failure reason
+      const lastParsed = JSON.parse(lines[lines.length - 1]) as { result?: LndPaymentResult } & LndPaymentResult;
+      const last = lastParsed.result ?? lastParsed;
+      const reason = last.failure_reason ?? last.status ?? 'unknown';
       throw new Error(`LND payment failed: ${reason}`);
     }
 
-    const preimageBase64 = result.result.payment_preimage ?? '';
-    const hashBase64 = result.result.payment_hash ?? '';
+    // Extract preimage — support both snake_case and camelCase field names
+    // (grpc-gateway version differences)
+    const preimageRaw = payment.payment_preimage ?? payment.paymentPreimage ?? '';
+    const hashRaw = payment.payment_hash ?? payment.paymentHash ?? '';
+
+    if (!preimageRaw) {
+      throw new Error('LND payment succeeded but returned empty preimage');
+    }
+
+    // LND REST API returns bytes fields as either base64 or hex depending
+    // on the grpc-gateway version and LND configuration.
+    // Detect the encoding and normalize to hex for L402.
+    const preimage = bytesFieldToHex(preimageRaw);
+    const paymentHash = bytesFieldToHex(hashRaw);
+
+    // Sanity check: verify SHA256(preimage) == paymentHash
+    const crypto = await import('crypto');
+    const computedHash = crypto.createHash('sha256').update(Buffer.from(preimage, 'hex')).digest('hex');
+    if (computedHash !== paymentHash) {
+      throw new Error(
+        `Preimage verification failed: SHA256(preimage) does not match payment hash`,
+      );
+    }
 
     return {
-      preimage: base64ToHex(preimageBase64),
-      paymentHash: base64ToHex(hashBase64),
-      amountSats: parseInt(result.result.value_sat ?? '0', 10),
-      feeSats: parseInt(result.result.fee_sat ?? '0', 10),
+      preimage,
+      paymentHash,
+      amountSats: parseInt(payment.value_sat ?? payment.valueSat ?? '0', 10),
+      feeSats: parseInt(payment.fee_sat ?? payment.feeSat ?? '0', 10),
     };
   }
 
@@ -133,9 +159,40 @@ export class LndBackend implements LnBackend {
   }
 }
 
-/** Convert a base64 string to hex. */
-function base64ToHex(b64: string): string {
-  if (!b64) return '';
-  const bytes = Buffer.from(b64, 'base64');
+/** Shape of a payment result from LND v2/router/send (supports both casing conventions). */
+interface LndPaymentResult {
+  status?: string;
+  payment_preimage?: string;
+  paymentPreimage?: string;
+  payment_hash?: string;
+  paymentHash?: string;
+  value_sat?: string;
+  valueSat?: string;
+  fee_sat?: string;
+  feeSat?: string;
+  failure_reason?: string;
+}
+
+/**
+ * Normalize a bytes field from LND REST API to hex string.
+ *
+ * LND's REST API (grpc-gateway) encodes protobuf `bytes` fields as
+ * either base64 (standard grpc-gateway) or hex (some LND versions,
+ * especially via Umbrel/wrapper proxies). We detect the format:
+ *
+ * - If the string is valid hex (only [0-9a-fA-F]) and has the right
+ *   length for 32 bytes (64 chars), treat it as hex.
+ * - Otherwise, decode as base64 and convert to hex.
+ */
+function bytesFieldToHex(raw: string): string {
+  if (!raw) return '';
+
+  // Check if it's already a hex string (32 bytes = 64 hex chars)
+  if (/^[0-9a-fA-F]+$/.test(raw) && raw.length === 64) {
+    return raw.toLowerCase();
+  }
+
+  // Otherwise, decode as base64
+  const bytes = Buffer.from(raw, 'base64');
   return bytes.toString('hex');
 }

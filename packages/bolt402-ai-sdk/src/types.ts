@@ -132,4 +132,6 @@ export interface L402Response {
   paid: boolean;
   /** Payment receipt, if a payment was made. */
   receipt: Receipt | null;
+  /** Whether a previously cached L402 token was used (no new payment needed). */
+  cachedToken: boolean;
 }

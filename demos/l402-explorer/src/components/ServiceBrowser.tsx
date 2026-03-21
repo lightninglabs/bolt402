@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import type { L402Service, CategoryOption, SpendingEntry } from '@/lib/types';
 import ServiceCard from './ServiceCard';
 import ProtocolFlow from './ProtocolFlow';
@@ -12,6 +12,21 @@ interface ServiceBrowserProps {
   categories: CategoryOption[];
 }
 
+interface ReceiptResponse {
+  totalSpentSats: number;
+  paymentCount: number;
+  receipts: Array<{
+    url: string;
+    amountSats: number;
+    feeSats: number;
+    totalCostSats: number;
+    paymentHash: string;
+    httpStatus: number;
+    latencyMs: number;
+    timestamp: string;
+  }>;
+}
+
 export default function ServiceBrowser({
   initialServices,
   categories,
@@ -21,6 +36,45 @@ export default function ServiceBrowser({
   const [selectedService, setSelectedService] = useState<L402Service | null>(null);
   const [spending, setSpending] = useState<SpendingEntry[]>([]);
   const [activeTab, setActiveTab] = useState<'services' | 'chat'>('services');
+  const lastPaymentCount = useRef(0);
+
+  // Poll /api/l402-receipts for spending data from the shared backend
+  useEffect(() => {
+    let active = true;
+
+    async function fetchReceipts() {
+      try {
+        const res = await fetch('/api/l402-receipts');
+        if (!res.ok || !active) return;
+        const data: ReceiptResponse = await res.json();
+
+        // Only update if there are new receipts
+        if (data.paymentCount > lastPaymentCount.current) {
+          lastPaymentCount.current = data.paymentCount;
+          setSpending(
+            data.receipts.map((r) => ({
+              url: r.url,
+              service: initialServices.find((s) => r.url.startsWith(s.url))?.name || 'Unknown',
+              amountSats: r.amountSats,
+              feeSats: r.feeSats,
+              timestamp: r.timestamp,
+              status: r.httpStatus,
+              latencyMs: r.latencyMs,
+            })),
+          );
+        }
+      } catch {
+        // Silently ignore fetch errors
+      }
+    }
+
+    fetchReceipts();
+    const interval = setInterval(fetchReceipts, 3000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [initialServices]);
 
   const filteredServices = useMemo(() => {
     let filtered = initialServices;
@@ -36,7 +90,7 @@ export default function ServiceBrowser({
       filtered = filtered.filter(
         (s) =>
           s.name.toLowerCase().includes(q) ||
-          s.description.toLowerCase().includes(q) ||
+          (s.description || '').toLowerCase().includes(q) ||
           (s.provider || '').toLowerCase().includes(q),
       );
     }
@@ -44,22 +98,6 @@ export default function ServiceBrowser({
     return filtered;
   }, [initialServices, selectedCategory, search]);
 
-  const handleSpend = useCallback(
-    (entry: {
-      service: string;
-      url: string;
-      amountSats: number;
-      feeSats: number;
-      latencyMs: number;
-      status: number;
-    }) => {
-      setSpending((prev) => [
-        ...prev,
-        { ...entry, timestamp: new Date().toISOString() },
-      ]);
-    },
-    [],
-  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -157,8 +195,8 @@ export default function ServiceBrowser({
 
         {/* Right: Chat panel */}
         <div className={`w-full sm:w-[420px] sm:shrink-0 ${activeTab === 'services' ? 'hidden sm:block' : ''}`}>
-          <div className="sm:sticky sm:top-20 h-[calc(100vh-12rem)]">
-            <ChatPanel services={initialServices} onSpend={handleSpend} />
+          <div className="sm:sticky sm:top-20 h-[calc(100vh-12rem)] min-h-[400px] overflow-hidden">
+            <ChatPanel services={initialServices} />
           </div>
         </div>
       </div>
@@ -176,7 +214,6 @@ export default function ServiceBrowser({
         <ProtocolFlow
           service={selectedService}
           onClose={() => setSelectedService(null)}
-          onSpend={handleSpend}
         />
       )}
     </div>

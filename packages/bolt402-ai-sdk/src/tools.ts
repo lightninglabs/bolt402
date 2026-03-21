@@ -42,6 +42,8 @@ export interface Bolt402ToolsConfig {
   maxFeeSats?: number;
   /** Custom fetch function (for testing). */
   fetchFn?: typeof fetch;
+  /** Use an existing L402Client instead of creating a new one. When provided, backend/tokenStore/budget/maxFeeSats/fetchFn are ignored. */
+  client?: L402Client;
 }
 
 /**
@@ -56,16 +58,14 @@ export interface Bolt402ToolsConfig {
  * - `l402_get_receipts`: Get payment receipts for cost tracking
  */
 export function createBolt402Tools(config: Bolt402ToolsConfig) {
-  const clientConfig: L402ClientConfig = {
+  const client = config.client ?? new L402Client({
     backend: config.backend,
     tokenStore: config.tokenStore ?? new InMemoryTokenStore(),
     budget: config.budget,
     maxFeeSats: config.maxFeeSats,
     fetchFn: config.fetchFn,
-  };
-
-  const client = new L402Client(clientConfig);
-  const backend = config.backend;
+  });
+  const backend = config.client ? config.client.getBackend() : config.backend;
 
   return {
     l402_fetch: tool({

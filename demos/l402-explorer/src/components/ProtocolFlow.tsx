@@ -13,14 +13,6 @@ interface FlowStep {
 interface ProtocolFlowProps {
   service: L402Service;
   onClose: () => void;
-  onSpend: (entry: {
-    service: string;
-    url: string;
-    amountSats: number;
-    feeSats: number;
-    latencyMs: number;
-    status: number;
-  }) => void;
 }
 
 const INITIAL_STEPS: FlowStep[] = [
@@ -31,7 +23,7 @@ const INITIAL_STEPS: FlowStep[] = [
   { id: 'response', label: 'Response Data', status: 'pending', detail: 'Receive the paid content' },
 ];
 
-export default function ProtocolFlow({ service, onClose, onSpend }: ProtocolFlowProps) {
+export default function ProtocolFlow({ service, onClose }: ProtocolFlowProps) {
   const [steps, setSteps] = useState<FlowStep[]>(INITIAL_STEPS);
   const [running, setRunning] = useState(false);
   const [responseBody, setResponseBody] = useState<string | null>(null);
@@ -49,8 +41,6 @@ export default function ProtocolFlow({ service, onClose, onSpend }: ProtocolFlow
     );
     await new Promise((r) => setTimeout(r, 600));
 
-    const startTime = Date.now();
-
     try {
       const res = await fetch('/api/l402-fetch', {
         method: 'POST',
@@ -59,7 +49,6 @@ export default function ProtocolFlow({ service, onClose, onSpend }: ProtocolFlow
       });
 
       const data = await res.json();
-      const latencyMs = Date.now() - startTime;
 
       // Mark request complete
       setSteps((s) =>
@@ -91,15 +80,6 @@ export default function ProtocolFlow({ service, onClose, onSpend }: ProtocolFlow
         if (data.body) {
           setResponseBody(typeof data.body === 'string' ? data.body.slice(0, 2000) : JSON.stringify(data.body).slice(0, 2000));
         }
-
-        onSpend({
-          service: service.name,
-          url: service.url,
-          amountSats: data.receipt?.amountSats ?? 0,
-          feeSats: data.receipt?.feeSats ?? 0,
-          latencyMs,
-          status: data.status,
-        });
       }
     } catch (err) {
       setSteps((s) =>
@@ -112,7 +92,7 @@ export default function ProtocolFlow({ service, onClose, onSpend }: ProtocolFlow
     }
 
     setRunning(false);
-  }, [service, onSpend]);
+  }, [service]);
 
   const statusColor = (status: FlowStep['status']) => {
     switch (status) {

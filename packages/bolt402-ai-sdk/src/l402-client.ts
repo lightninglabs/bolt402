@@ -106,7 +106,7 @@ export class L402Client {
       const response = await this.sendWithAuth(url, method, options.body, options.headers, cached.macaroon, cached.preimage);
 
       if (response.status !== 402) {
-        return this.buildResponse(response, false, null);
+        return this.buildResponse(response, false, null, true);
       }
 
       // Token was rejected, remove from cache
@@ -153,7 +153,8 @@ export class L402Client {
 
     if (retryResponse.status === 402) {
       await this.tokenStore.remove(url);
-      throw new L402Error('Server returned 402 again after payment');
+      const retryBody = await retryResponse.clone().text().catch(() => '');
+      throw new L402Error(`Server returned 402 again after payment. Response: ${retryBody.slice(0, 300)}`);
     }
 
     const latencyMs = Date.now() - startTime;
@@ -242,6 +243,7 @@ export class L402Client {
     response: Response,
     paid: boolean,
     receipt: Receipt | null,
+    cachedToken = false,
   ): Promise<L402Response> {
     const headers: Record<string, string> = {};
     response.headers.forEach((value, key) => {
@@ -256,6 +258,7 @@ export class L402Client {
       body: bodyText,
       paid,
       receipt,
+      cachedToken,
     };
   }
 }

@@ -1,41 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  L402Client,
-  LndBackend,
-  SwissKnifeBackend,
-  type LnBackend,
-} from 'bolt402-ai-sdk';
-import { MockBackend } from '@/lib/mock-backend';
-
-function createBackend(): LnBackend {
-  const backendType = process.env.BACKEND_TYPE || 'mock';
-
-  if (backendType === 'lnd' && process.env.LND_URL && process.env.LND_MACAROON) {
-    return new LndBackend({
-      url: process.env.LND_URL,
-      macaroon: process.env.LND_MACAROON,
-    });
-  }
-
-  if (
-    backendType === 'swissknife' &&
-    process.env.SWISSKNIFE_URL &&
-    process.env.SWISSKNIFE_API_KEY
-  ) {
-    return new SwissKnifeBackend({
-      url: process.env.SWISSKNIFE_URL,
-      apiKey: process.env.SWISSKNIFE_API_KEY,
-    });
-  }
-
-  return new MockBackend();
-}
+import { getSharedL402Client } from '@/lib/l402-shared';
 
 /**
  * API route that performs a full L402 flow server-side.
  *
- * Uses the same L402Client + configured backend as the AI chat,
- * so it can actually pay invoices (real or mock) and return data.
+ * Uses the shared L402Client so receipts accumulate across all routes
+ * and can be queried via /api/l402-receipts.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -45,12 +15,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing url' }, { status: 400 });
     }
 
-    const backend = createBackend();
-    const client = new L402Client({
-      backend,
-      budget: { perRequestMax: 1000, dailyMax: 50000 },
-      maxFeeSats: 100,
-    });
+    const client = getSharedL402Client();
 
     const startTime = Date.now();
     const response = await client.fetch(url, { method });
@@ -90,6 +55,31 @@ export async function POST(req: NextRequest) {
         label: 'Retry with Token',
         status: 'complete',
         detail: 'Authorization: L402 <macaroon>:<preimage>',
+      });
+      steps.push({
+        id: 'response',
+        label: 'Response Data',
+        status: 'complete',
+        detail: `Status ${response.status} — ${body.length} bytes`,
+      });
+    } else if (response.cachedToken) {
+      steps.push({
+        id: 'challenge',
+        label: 'Cached L402 Token',
+        status: 'complete',
+        detail: 'Used previously paid token — no new payment needed',
+      });
+      steps.push({
+        id: 'payment',
+        label: 'Lightning Payment',
+        status: 'complete',
+        detail: 'Skipped — token still valid',
+      });
+      steps.push({
+        id: 'retry',
+        label: 'Authenticated Request',
+        status: 'complete',
+        detail: 'Authorization: L402 <macaroon>:<preimage> (cached)',
       });
       steps.push({
         id: 'response',
@@ -143,10 +133,25 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     let message = error instanceof Error ? error.message : 'Unknown error';
+    const cause = error instanceof Error ? (error.cause as Error)?.message ?? '' : '';
 
     // Improve common error messages
-    if (message.includes('HTTP request to an HTTPS server')) {
+    if (message === 'fetch failed' || message === 'Failed to fetch') {
+      if (cause.includes('self-signed certificate') || cause.includes('certificate')) {
+        message = `TLS error: the service uses a self-signed certificate. Set NODE_TLS_REJECT_UNAUTHORIZED=0 in .env.local for local development.`;
+      } else if (cause) {
+        message = `Could not reach service: ${cause}`;
+      } else {
+        message = 'Could not reach service (DNS resolution failed, connection refused, or TLS error)';
+      }
+    } else if (message.includes('HTTP request to an HTTPS server')) {
       message += '. Check that LND_URL uses https:// (e.g. https://umbrel.local:8080)';
+    } else if (message.includes('ECONNREFUSED')) {
+      message = `Connection refused. The service may be down.`;
+    } else if (message.includes('ENOTFOUND')) {
+      message = `DNS lookup failed: the hostname could not be resolved. The service may no longer exist.`;
+    } else if (message.includes('certificate')) {
+      message = `TLS/SSL error: ${message}. The service may have an invalid certificate.`;
     }
 
     return NextResponse.json(

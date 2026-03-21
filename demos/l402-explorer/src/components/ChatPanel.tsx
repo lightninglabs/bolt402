@@ -3,22 +3,14 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { useState, useRef, useEffect, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
 import type { L402Service } from '@/lib/types';
 
 interface ChatPanelProps {
   services: L402Service[];
-  onSpend: (entry: {
-    service: string;
-    url: string;
-    amountSats: number;
-    feeSats: number;
-    latencyMs: number;
-    status: number;
-  }) => void;
 }
 
 interface ToolInvocationResult {
-  url?: string;
   status?: number;
   paid?: boolean;
   receipt?: {
@@ -49,8 +41,26 @@ const SUGGESTIONS = [
   "What's the Brent crude oil price?",
 ];
 
-export default function ChatPanel({ services, onSpend }: ChatPanelProps) {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+/**
+ * Resolve the tool name from an AI SDK v6 message part.
+ *
+ * Static tools (created with `tool()`) encode the name in the type string
+ * as "tool-<name>". Dynamic/MCP tools use type "dynamic-tool" with a
+ * separate `toolName` property.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function resolveToolPart(part: any): { toolName: string; state: string; input: unknown; output?: unknown } | null {
+  if (part.type === 'dynamic-tool') {
+    return { toolName: part.toolName, state: part.state, input: part.input, output: part.output };
+  }
+  if (typeof part.type === 'string' && part.type.startsWith('tool-') && part.type.length > 'tool-'.length) {
+    return { toolName: part.type.slice('tool-'.length), state: part.state, input: part.input, output: part.output };
+  }
+  return null;
+}
+
+export default function ChatPanel({ services }: ChatPanelProps) {
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [input, setInput] = useState('');
@@ -71,41 +81,12 @@ export default function ChatPanel({ services, onSpend }: ChatPanelProps) {
 
   const isLoading = status === 'streaming' || status === 'submitted';
 
-  // Track spending from completed tool invocations
+  // Auto-scroll to bottom (scroll the container, not the page)
   useEffect(() => {
-    for (const msg of messages) {
-      if (msg.role !== 'assistant') continue;
-      const parts = msg.parts;
-      if (!parts) continue;
-      for (const part of parts) {
-        if (!part.type.startsWith('tool-')) continue;
-        if (!('state' in part) || part.state !== 'output-available') continue;
-        if (!('toolName' in part)) continue;
-        const toolPart = part as { toolName: string; state: string; output: unknown; input: unknown };
-        const result = toolPart.output as ToolInvocationResult;
-        if (toolPart.toolName === 'l402_fetch' && result?.receipt) {
-          const key = `${result.receipt.paymentHash}`;
-          if (!(window as unknown as Record<string, unknown>)[`__spent_${key}`]) {
-            (window as unknown as Record<string, unknown>)[`__spent_${key}`] = true;
-            const urlStr = result.url || '';
-            const matchedService = services.find((s) => urlStr.startsWith(s.url));
-            onSpend({
-              service: matchedService?.name || 'Unknown',
-              url: urlStr,
-              amountSats: result.receipt.amountSats,
-              feeSats: result.receipt.feeSats,
-              latencyMs: result.receipt.latencyMs,
-              status: result.status || 200,
-            });
-          }
-        }
-      }
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
     }
-  }, [messages, services, onSpend]);
-
-  // Auto-scroll to bottom
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSuggestion = useCallback(
@@ -140,7 +121,7 @@ export default function ChatPanel({ services, onSpend }: ChatPanelProps) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
         {!hasInteracted && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center py-8">
             <span className="text-4xl mb-3">⚡</span>
@@ -174,15 +155,22 @@ export default function ChatPanel({ services, onSpend }: ChatPanelProps) {
               {/* Render parts */}
               {msg.parts?.map((part, i) => {
                 if (part.type === 'text') {
+                  if (msg.role === 'user') {
+                    return (
+                      <div key={i} className="whitespace-pre-wrap break-words">
+                        {part.text}
+                      </div>
+                    );
+                  }
                   return (
-                    <div key={i} className="whitespace-pre-wrap break-words prose-sm prose-invert">
-                      {part.text}
+                    <div key={i} className="prose prose-sm prose-invert max-w-none prose-p:my-1.5 prose-headings:my-2 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-pre:my-2 prose-code:text-[#F7931A] prose-code:bg-zinc-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-pre:bg-zinc-800 prose-pre:border prose-pre:border-zinc-700 prose-a:text-[#F7931A] prose-strong:text-zinc-100">
+                      <ReactMarkdown>{part.text}</ReactMarkdown>
                     </div>
                   );
                 }
 
-                if (part.type.startsWith('tool-')) {
-                  const toolPart = part as { type: string; toolName: string; state: string; input: unknown; output?: unknown };
+                const toolPart = resolveToolPart(part);
+                if (toolPart) {
                   return (
                     <ToolCallDisplay
                       key={i}
@@ -224,7 +212,6 @@ export default function ChatPanel({ services, onSpend }: ChatPanelProps) {
           </div>
         )}
 
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
