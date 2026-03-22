@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **bolt402-cln**: Core Lightning (CLN) gRPC backend adapter implementing `LnBackend`. (#53)
+- **bolt402-nwc**: Nostr Wallet Connect (NIP-47) backend adapter implementing `LnBackend`. (#51)
+- **bolt402-sqlite**: SQLite persistent token store implementing `TokenStore`. (#48)
+- **bolt402-ffi**: C-compatible FFI layer for cross-language bindings. (#44)
+- **bolt402-python**: Python bindings via PyO3/maturin. (#23)
+- **bolt402-wasm**: WebAssembly bindings via wasm-pack. (#46)
+- **bolt402-go** (bindings): Go bindings via CGo + bolt402-ffi. (#44)
+- **bolt402-langchain**: LangChain Python integration with L402FetchTool, L402BudgetTool, PaymentCallbackHandler. (#57)
+- BOLT11 invoice amount decoding for budget enforcement. (#21)
+- LocalStorage and File token stores in bolt402-ai-sdk. (#32)
+- L402 Explorer interactive demo (Next.js). (#34)
+- AI Research Agent demo. (#36)
+- bolt402 vs lnget comparison page. (#37)
+- 402index.io MCP server integration for dynamic service discovery. (#41)
 - CONTRIBUTING.md with development setup, coding standards, and PR workflow.
 - GitHub issue templates for bug reports and feature requests.
 - This CHANGELOG.md file.
