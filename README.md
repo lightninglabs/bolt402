@@ -176,19 +176,36 @@ cargo doc --no-deps  # Build docs
 
 ## Roadmap
 
-- [x] Core L402 client engine
-- [x] LND gRPC backend
-- [x] SwissKnife REST backend
-- [x] Mock L402 server
-- [x] CI/CD pipeline
-- [x] Vercel AI SDK integration
-- [x] Comprehensive documentation
-- [ ] Python bindings (PyO3)
-- [ ] TypeScript bindings (napi-rs)
-- [ ] Go bindings (cgo)
-- [ ] WASM bindings (wasm-pack)
-- [ ] LangChain integration
-- [ ] MCP server mode
+### Completed
+
+- [x] Core L402 client engine (hexagonal architecture)
+- [x] LND gRPC backend adapter
+- [x] CLN (Core Lightning) gRPC backend adapter
+- [x] Nostr Wallet Connect (NWC/NIP-47) backend adapter
+- [x] SwissKnife REST backend adapter
+- [x] Mock L402 server for testing
+- [x] SQLite persistent token store
+- [x] CI/CD pipeline (fmt, clippy, test, doc, FFI, WASM)
+- [x] Vercel AI SDK integration (TypeScript)
+- [x] Python bindings (PyO3)
+- [x] Go bindings (CGo)
+- [x] WASM bindings (wasm-pack)
+- [x] C FFI layer (bolt402-ffi)
+- [x] MCP server for universal AI agent integration
+- [x] L402 Explorer demo
+- [x] AI Research Agent demo
+- [x] bolt402 vs lnget comparison page
+- [x] Comprehensive documentation and tutorials
+
+### Upcoming
+
+- [ ] LangChain / LlamaIndex Python integration
+- [ ] CrewAI agent toolkit integration
+- [ ] TypeScript bindings via napi-rs (native Node.js addon)
+- [ ] Package publishing (crates.io, PyPI, npm)
+- [ ] OpenAPI / Swagger integration examples
+- [ ] Streaming payment support (pay-per-token)
+- [ ] Multi-backend failover (fallback chain)
 
 ## License
 
