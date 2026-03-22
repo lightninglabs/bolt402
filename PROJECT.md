@@ -28,8 +28,9 @@ Renamed from `lnpay` (name already taken by other projects). Full original propo
 ## Architecture
 
 - **Rust workspace** with hexagonal/clean architecture
-- Crates: `bolt402-proto`, `bolt402-core`, `bolt402-lnd`, `bolt402-mock`
-- Future: FFI bindings (PyO3, napi-rs, cgo, wasm-pack)
+- Crates: `bolt402-proto`, `bolt402-core`, `bolt402-lnd`, `bolt402-cln`, `bolt402-nwc`, `bolt402-swissknife`, `bolt402-mock`, `bolt402-sqlite`, `bolt402-ffi`, `bolt402-python`, `bolt402-wasm`
+- Bindings: `bolt402-go` (CGo), Python (PyO3), WASM (wasm-pack)
+- Packages: `bolt402-ai-sdk` (Vercel AI SDK, TS), `bolt402-langchain` (LangChain, Python)
 - Autonomous project. Toshi as maintainer, Dario as manager/reviewer
 
 ## Workflow
@@ -72,7 +73,7 @@ Renamed from `lnpay` (name already taken by other projects). Full original propo
 - [x] bolt402-cln: Core Lightning (CLN) gRPC backend adapter — Issue #52 / PR #53
 - [x] README roadmap updated to reflect all completed features — Issue #54 / PR #56
 
-- [x] bolt402-langchain: LangChain Python integration package — Issue #55 / PR #57 (pending)
+- [x] bolt402-langchain: LangChain Python integration package — Issue #55 / PR #57
 
 ### Next Up
 - [ ] (Backlog empty — create new issues for next features)
