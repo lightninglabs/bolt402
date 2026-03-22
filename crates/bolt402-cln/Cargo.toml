@@ -1,0 +1,30 @@
+[package]
+name = "bolt402-cln"
+description = "Core Lightning (CLN) gRPC backend adapter for bolt402 L402 client SDK"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+categories = ["authentication", "web-programming::http-client"]
+keywords = ["l402", "lightning", "bitcoin", "cln", "grpc"]
+
+[dependencies]
+bolt402-core = { workspace = true }
+async-trait = { workspace = true }
+hex = { workspace = true }
+prost = "0.13"
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["sync", "fs"] }
+tonic = { version = "0.12", features = ["tls"] }
+tracing = { workspace = true }
+
+[build-dependencies]
+tonic-build = "0.12"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }

@@ -21,6 +21,7 @@ bolt402/
 │   │                      # Adapters: InMemoryTokenStore, BudgetTracker
 │   ├── bolt402-lnd/       # LND gRPC backend adapter
 │   ├── bolt402-nwc/       # Nostr Wallet Connect (NIP-47) backend adapter
+│   ├── bolt402-cln/       # Core Lightning (CLN) gRPC backend adapter
 │   ├── bolt402-mock/      # Mock L402 server for testing and development
 │   ├── bolt402-swissknife/# SwissKnife REST API backend adapter
 │   ├── bolt402-sqlite/    # SQLite persistent token store adapter
@@ -48,6 +49,8 @@ bolt402-core   (depends on proto: client engine, ports, adapters)
 bolt402-lnd    (depends on core: implements LnBackend for LND)
 
 bolt402-nwc    (depends on core: implements LnBackend via NIP-47/NWC)
+
+bolt402-cln    (depends on core: implements LnBackend for CLN via gRPC)
 
 bolt402-mock   (depends on proto: standalone mock L402 server)
 

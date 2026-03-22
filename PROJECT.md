@@ -68,6 +68,7 @@ Renamed from `lnpay` (name already taken by other projects). Full original propo
 - [x] bolt402-ffi + bolt402-go: Go bindings via CGo FFI — Issue #42 / PR #44
 - [x] bolt402-wasm: WebAssembly bindings via wasm-pack — Issue #45 / PR #46
 - [x] bolt402-sqlite: SQLite persistent token store — Issue #47 / PR #48
-- [ ] bolt402-nwc: Nostr Wallet Connect (NIP-47) backend — Issue #50
+- [x] bolt402-nwc: Nostr Wallet Connect (NIP-47) backend — Issue #50 / PR #51
+- [x] bolt402-cln: Core Lightning (CLN) gRPC backend adapter — Issue #52 / PR #53
 
 **Note on signed commits**: Repo ruleset requires signed commits on `main`. Workaround: push unsigned commits to feature branches, create PRs, squash-merge via GitHub (GitHub signs the merge commit automatically).

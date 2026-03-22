@@ -26,6 +26,7 @@ bolt402 follows **hexagonal architecture** (ports and adapters), inspired by dom
 | `bolt402-proto` | Shared protocol types: `L402Challenge`, `L402Token`, `L402Error`. No internal dependencies. |
 | `bolt402-core` | The L402 client engine. Defines ports (`LnBackend`, `TokenStore`) and contains the `L402Client`, `BudgetTracker`, `InMemoryTokenStore`, and `Receipt` types. |
 | `bolt402-lnd` | Implements `LnBackend` for LND via gRPC (using vendored proto definitions). |
+| `bolt402-cln` | Implements `LnBackend` for Core Lightning (CLN) via gRPC with mTLS authentication. |
 | `bolt402-swissknife` | Implements `LnBackend` for Numeraire SwissKnife via REST API. |
 | `bolt402-mock` | A mock L402 server and mock Lightning backend for testing. No real Lightning infrastructure needed. |
 | `bolt402-ai-sdk` | TypeScript package providing Vercel AI SDK tools. Ports the hexagonal architecture to TypeScript. |

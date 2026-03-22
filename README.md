@@ -27,6 +27,7 @@ bolt402 fills that gap.
 │       │                             │
 │  Lightning Backend (pluggable)      │
 │  ├── LND (gRPC)                     │
+│  ├── CLN (gRPC)                     │
 │  ├── NWC (Nostr Wallet Connect)     │
 │  ├── SwissKnife (REST)              │
 │  ├── Mock (testing)                 │
@@ -45,6 +46,7 @@ See [docs/architecture.md](docs/architecture.md) for the full design breakdown.
 | [`bolt402-proto`](crates/bolt402-proto) | L402 protocol types, challenge parsing, token construction | ✅ Complete |
 | [`bolt402-core`](crates/bolt402-core) | Client engine, ports, budget tracker, token cache, receipts | ✅ Complete |
 | [`bolt402-lnd`](crates/bolt402-lnd) | LND gRPC backend adapter | ✅ Complete |
+| [`bolt402-cln`](crates/bolt402-cln) | Core Lightning (CLN) gRPC backend adapter | ✅ Complete |
 | [`bolt402-nwc`](crates/bolt402-nwc) | Nostr Wallet Connect (NIP-47) backend adapter | ✅ Complete |
 | [`bolt402-swissknife`](crates/bolt402-swissknife) | SwissKnife REST backend adapter | ✅ Complete |
 | [`bolt402-mock`](crates/bolt402-mock) | Mock L402 server for testing (no real Lightning needed) | ✅ Complete |
