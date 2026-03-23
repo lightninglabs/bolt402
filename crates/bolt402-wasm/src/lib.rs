@@ -824,6 +824,518 @@ pub fn version() -> String {
 }
 
 // ---------------------------------------------------------------------------
+// WasmL402Engine — real L402 client with JS-delegated I/O
+// ---------------------------------------------------------------------------
+
+/// Result of a payment delegated to JavaScript.
+///
+/// JavaScript calls the engine's payment callback and returns this struct.
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct WasmPaymentResult {
+    preimage: String,
+    payment_hash: String,
+    /// Amount paid in satoshis.
+    #[wasm_bindgen(readonly, js_name = "amountSats")]
+    pub amount_sats: u64,
+    /// Fee paid in satoshis.
+    #[wasm_bindgen(readonly, js_name = "feeSats")]
+    pub fee_sats: u64,
+}
+
+#[wasm_bindgen]
+impl WasmPaymentResult {
+    /// Create a payment result from JavaScript.
+    #[wasm_bindgen(constructor)]
+    pub fn new(preimage: String, payment_hash: String, amount_sats: u64, fee_sats: u64) -> Self {
+        Self {
+            preimage,
+            payment_hash,
+            amount_sats,
+            fee_sats,
+        }
+    }
+
+    /// Hex-encoded preimage.
+    #[wasm_bindgen(getter)]
+    pub fn preimage(&self) -> String {
+        self.preimage.clone()
+    }
+
+    /// Hex-encoded payment hash.
+    #[wasm_bindgen(getter, js_name = "paymentHash")]
+    pub fn payment_hash(&self) -> String {
+        self.payment_hash.clone()
+    }
+}
+
+/// Configuration for creating a `WasmL402Engine`.
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct WasmEngineConfig {
+    max_fee_sats: u64,
+    budget: WasmBudget,
+}
+
+#[wasm_bindgen]
+impl WasmEngineConfig {
+    /// Create engine configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_fee_sats` - Maximum routing fee in satoshis
+    /// * `budget` - Optional budget; pass `undefined` for unlimited
+    #[wasm_bindgen(constructor)]
+    pub fn new(max_fee_sats: u64, budget: Option<WasmBudget>) -> Self {
+        Self {
+            max_fee_sats,
+            budget: budget.unwrap_or_else(WasmBudget::unlimited),
+        }
+    }
+}
+
+/// L402 protocol engine for real HTTP APIs.
+///
+/// Encapsulates all L402 protocol logic (challenge parsing, token construction,
+/// budget enforcement, token caching, receipt tracking) in Rust/WASM, while
+/// delegating HTTP requests and Lightning payments to JavaScript callbacks.
+///
+/// This is the bridge between Rust protocol logic and JavaScript I/O:
+///
+/// ```text
+/// bolt402-ai-sdk (TS)
+///     │
+///     └── WasmL402Engine (Rust/WASM)
+///             ├── parseChallenge (Rust, from bolt402-proto)
+///             ├── buildToken (Rust)
+///             ├── budget enforcement (Rust)
+///             ├── token cache (Rust, in-memory)
+///             └── HTTP + Lightning → JS callbacks
+/// ```
+///
+/// # Example (JavaScript)
+///
+/// ```javascript
+/// import init, { WasmL402Engine, WasmEngineConfig, WasmPaymentResult } from 'bolt402-wasm';
+///
+/// await init();
+///
+/// const config = new WasmEngineConfig(100n);
+/// const engine = new WasmL402Engine(config);
+///
+/// const result = await engine.fetch(
+///   "https://api.example.com/data",
+///   "GET",
+///   undefined,
+///   undefined,
+///   // fetchFn: (url, method, body, headers) => Promise<{status, headers, body}>
+///   async (url, method, body, headers) => {
+///     const resp = await fetch(url, { method, body, headers: JSON.parse(headers) });
+///     const respHeaders = {};
+///     resp.headers.forEach((v, k) => { respHeaders[k] = v; });
+///     return { status: resp.status, headers: JSON.stringify(respHeaders), body: await resp.text() };
+///   },
+///   // payInvoiceFn: (invoice, maxFeeSats) => Promise<WasmPaymentResult>
+///   async (invoice, maxFeeSats) => {
+///     const result = await lndBackend.payInvoice(invoice, maxFeeSats);
+///     return new WasmPaymentResult(result.preimage, result.paymentHash, result.amountSats, result.feeSats);
+///   },
+/// );
+/// ```
+#[wasm_bindgen]
+pub struct WasmL402Engine {
+    config: WasmEngineConfig,
+    budget_state: RefCell<BudgetState>,
+    token_cache: RefCell<HashMap<String, (String, String)>>,
+    receipts: RefCell<Vec<WasmReceipt>>,
+}
+
+/// Response from a JS fetch callback, passed back into the engine.
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct WasmFetchResponse {
+    /// HTTP status code.
+    #[wasm_bindgen(readonly)]
+    pub status: u16,
+    /// JSON-encoded headers object.
+    headers: String,
+    /// Response body.
+    body: String,
+}
+
+#[wasm_bindgen]
+impl WasmFetchResponse {
+    /// Create a fetch response from JavaScript.
+    #[wasm_bindgen(constructor)]
+    pub fn new(status: u16, headers: String, body: String) -> Self {
+        Self {
+            status,
+            headers,
+            body,
+        }
+    }
+
+    /// Response headers as JSON string.
+    #[wasm_bindgen(getter)]
+    pub fn headers(&self) -> String {
+        self.headers.clone()
+    }
+
+    /// Response body.
+    #[wasm_bindgen(getter)]
+    pub fn body(&self) -> String {
+        self.body.clone()
+    }
+}
+
+/// Full response from the L402 engine's fetch method.
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct WasmEngineResponse {
+    /// HTTP status code.
+    #[wasm_bindgen(readonly)]
+    pub status: u16,
+    /// Whether a Lightning payment was made.
+    #[wasm_bindgen(readonly)]
+    pub paid: bool,
+    /// Whether a cached token was used.
+    #[wasm_bindgen(readonly, js_name = "cachedToken")]
+    pub cached_token: bool,
+    body: String,
+    headers: String,
+    receipt: Option<WasmReceipt>,
+}
+
+#[wasm_bindgen]
+impl WasmEngineResponse {
+    /// Response body.
+    #[wasm_bindgen(getter)]
+    pub fn body(&self) -> String {
+        self.body.clone()
+    }
+
+    /// Response headers as JSON string.
+    #[wasm_bindgen(getter)]
+    pub fn headers(&self) -> String {
+        self.headers.clone()
+    }
+
+    /// Payment receipt, if a payment was made.
+    #[wasm_bindgen(getter)]
+    pub fn receipt(&self) -> Option<WasmReceipt> {
+        self.receipt.clone()
+    }
+}
+
+#[wasm_bindgen]
+impl WasmL402Engine {
+    /// Create a new L402 engine with the given configuration.
+    #[wasm_bindgen(constructor)]
+    pub fn new(config: WasmEngineConfig) -> Self {
+        Self {
+            config,
+            budget_state: RefCell::new(BudgetState::default()),
+            token_cache: RefCell::new(HashMap::new()),
+            receipts: RefCell::new(Vec::new()),
+        }
+    }
+
+    /// Execute an L402-aware HTTP request.
+    ///
+    /// This is the core method. It:
+    /// 1. Checks the token cache for a valid credential
+    /// 2. Makes the initial HTTP request (via `fetch_fn`)
+    /// 3. If 402, parses the challenge
+    /// 4. Checks the budget
+    /// 5. Pays the invoice (via `pay_invoice_fn`)
+    /// 6. Caches the token
+    /// 7. Retries with L402 authorization
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - Target URL
+    /// * `method` - HTTP method (GET, POST, etc.)
+    /// * `body` - Optional request body
+    /// * `extra_headers` - Optional JSON-encoded headers object
+    /// * `fetch_fn` - JS callback: `(url, method, body?, headersJson) => Promise<WasmFetchResponse>`
+    /// * `pay_invoice_fn` - JS callback: `(invoice, maxFeeSats) => Promise<WasmPaymentResult>`
+    pub async fn fetch(
+        &self,
+        url: &str,
+        method: &str,
+        body: Option<String>,
+        extra_headers: Option<String>,
+        fetch_fn: js_sys::Function,
+        pay_invoice_fn: js_sys::Function,
+    ) -> Result<WasmEngineResponse, JsError> {
+        let start_ms = now_secs() * 1000;
+
+        // 1. Check token cache
+        {
+            let cache = self.token_cache.borrow();
+            if let Some((macaroon, preimage)) = cache.get(url) {
+                let token = L402Token::new(macaroon.clone(), preimage.clone());
+                let auth_header = token.to_header_value();
+                let headers_with_auth =
+                    self.merge_headers(extra_headers.as_deref(), Some(&auth_header));
+
+                let resp = self
+                    .call_fetch(
+                        &fetch_fn,
+                        url,
+                        method,
+                        body.as_deref(),
+                        &headers_with_auth,
+                    )
+                    .await?;
+
+                if resp.status != 402 {
+                    return Ok(WasmEngineResponse {
+                        status: resp.status,
+                        paid: false,
+                        cached_token: true,
+                        body: resp.body,
+                        headers: resp.headers,
+                        receipt: None,
+                    });
+                }
+                // Token rejected, fall through
+                drop(cache);
+                self.token_cache.borrow_mut().remove(url);
+            }
+        }
+
+        // 2. Initial request without auth
+        let headers_json = self.merge_headers(extra_headers.as_deref(), None);
+        let resp = self
+            .call_fetch(&fetch_fn, url, method, body.as_deref(), &headers_json)
+            .await?;
+
+        if resp.status != 402 {
+            return Ok(WasmEngineResponse {
+                status: resp.status,
+                paid: false,
+                cached_token: false,
+                body: resp.body,
+                headers: resp.headers,
+                receipt: None,
+            });
+        }
+
+        // 3. Parse L402 challenge from headers
+        let resp_headers: HashMap<String, String> = serde_json::from_str(&resp.headers)
+            .unwrap_or_default();
+        let www_auth = resp_headers
+            .get("www-authenticate")
+            .or_else(|| resp_headers.get("WWW-Authenticate"))
+            .ok_or_else(|| JsError::new("server returned 402 but no WWW-Authenticate header"))?;
+
+        let challenge = L402Challenge::from_header(www_auth)
+            .map_err(|e| JsError::new(&format!("failed to parse L402 challenge: {e}")))?;
+
+        // 4. Decode invoice amount and check budget
+        let invoice_amount = bolt402_proto::decode_bolt11_amount(&challenge.invoice)
+            .ok()
+            .flatten()
+            .map_or(0, |a| a.satoshis());
+
+        self.budget_state
+            .borrow_mut()
+            .check_and_record(&self.config.budget, invoice_amount)
+            .map_err(|e| JsError::new(&e))?;
+
+        // 5. Pay the invoice via JS callback
+        let payment = self
+            .call_pay_invoice(&pay_invoice_fn, &challenge.invoice, self.config.max_fee_sats)
+            .await?;
+
+        // 6. Cache the token
+        self.token_cache.borrow_mut().insert(
+            url.to_string(),
+            (challenge.macaroon.clone(), payment.preimage.clone()),
+        );
+
+        // 7. Retry with L402 authorization
+        let token = L402Token::new(challenge.macaroon.clone(), payment.preimage.clone());
+        let auth_header = token.to_header_value();
+        let headers_with_auth =
+            self.merge_headers(extra_headers.as_deref(), Some(&auth_header));
+
+        let retry_resp = self
+            .call_fetch(
+                &fetch_fn,
+                url,
+                method,
+                body.as_deref(),
+                &headers_with_auth,
+            )
+            .await?;
+
+        if retry_resp.status == 402 {
+            self.token_cache.borrow_mut().remove(url);
+            return Err(JsError::new("server returned 402 again after payment"));
+        }
+
+        let _latency_ms = (now_secs() * 1000).saturating_sub(start_ms);
+
+        let receipt = WasmReceipt {
+            timestamp: now_secs(),
+            endpoint: url.to_string(),
+            amount_sats: payment.amount_sats,
+            fee_sats: payment.fee_sats,
+            payment_hash: payment.payment_hash.clone(),
+            preimage: payment.preimage.clone(),
+            response_status: retry_resp.status,
+        };
+
+        self.receipts.borrow_mut().push(receipt.clone());
+
+        Ok(WasmEngineResponse {
+            status: retry_resp.status,
+            paid: true,
+            cached_token: false,
+            body: retry_resp.body,
+            headers: retry_resp.headers,
+            receipt: Some(receipt),
+        })
+    }
+
+    /// Get total spent in satoshis.
+    #[wasm_bindgen(getter, js_name = "totalSpent")]
+    pub fn total_spent(&self) -> u64 {
+        self.budget_state.borrow().total
+    }
+
+    /// Get number of payments made.
+    #[wasm_bindgen(getter, js_name = "paymentCount")]
+    pub fn payment_count(&self) -> usize {
+        self.receipts.borrow().len()
+    }
+
+    /// Get all payment receipts.
+    pub fn receipts(&self) -> Vec<WasmReceipt> {
+        self.receipts.borrow().clone()
+    }
+
+    /// Clear the token cache.
+    #[wasm_bindgen(js_name = "clearCache")]
+    pub fn clear_cache(&self) {
+        self.token_cache.borrow_mut().clear();
+    }
+
+    /// Get the configured max fee in satoshis.
+    #[wasm_bindgen(getter, js_name = "maxFeeSats")]
+    pub fn max_fee_sats(&self) -> u64 {
+        self.config.max_fee_sats
+    }
+}
+
+impl WasmL402Engine {
+    /// Merge extra headers with an optional Authorization header, returning JSON.
+    fn merge_headers(&self, extra: Option<&str>, auth: Option<&str>) -> String {
+        let mut headers: HashMap<String, String> = extra
+            .and_then(|s| serde_json::from_str(s).ok())
+            .unwrap_or_default();
+
+        if let Some(auth_val) = auth {
+            headers.insert("Authorization".to_string(), auth_val.to_string());
+        }
+
+        serde_json::to_string(&headers).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// Call the JS fetch callback and extract the response.
+    async fn call_fetch(
+        &self,
+        fetch_fn: &js_sys::Function,
+        url: &str,
+        method: &str,
+        body: Option<&str>,
+        headers_json: &str,
+    ) -> Result<WasmFetchResponse, JsError> {
+        let this = JsValue::null();
+        let js_url = JsValue::from_str(url);
+        let js_method = JsValue::from_str(method);
+        let js_body = body.map_or(JsValue::undefined(), JsValue::from_str);
+        let js_headers = JsValue::from_str(headers_json);
+
+        let result = fetch_fn
+            .call4(&this, &js_url, &js_method, &js_body, &js_headers)
+            .map_err(|e| JsError::new(&format!("fetch callback failed: {e:?}")))?;
+
+        // Await the promise
+        let promise = js_sys::Promise::from(result);
+        let future = wasm_bindgen_futures::JsFuture::from(promise);
+        let resolved = future
+            .await
+            .map_err(|e| JsError::new(&format!("fetch promise rejected: {e:?}")))?;
+
+        // Extract fields from the response object
+        let status = js_sys::Reflect::get(&resolved, &JsValue::from_str("status"))
+            .ok()
+            .and_then(|v| v.as_f64())
+            .map_or(0, |n| n as u16);
+        let headers = js_sys::Reflect::get(&resolved, &JsValue::from_str("headers"))
+            .ok()
+            .and_then(|v| v.as_string())
+            .unwrap_or_else(|| "{}".to_string());
+        let body = js_sys::Reflect::get(&resolved, &JsValue::from_str("body"))
+            .ok()
+            .and_then(|v| v.as_string())
+            .unwrap_or_default();
+
+        Ok(WasmFetchResponse::new(status, headers, body))
+    }
+
+    /// Call the JS pay_invoice callback and extract the result.
+    async fn call_pay_invoice(
+        &self,
+        pay_fn: &js_sys::Function,
+        invoice: &str,
+        max_fee_sats: u64,
+    ) -> Result<WasmPaymentResult, JsError> {
+        let this = JsValue::null();
+        let js_invoice = JsValue::from_str(invoice);
+        let js_fee = JsValue::from_f64(max_fee_sats as f64);
+
+        let result = pay_fn
+            .call2(&this, &js_invoice, &js_fee)
+            .map_err(|e| JsError::new(&format!("pay_invoice callback failed: {e:?}")))?;
+
+        let promise = js_sys::Promise::from(result);
+        let future = wasm_bindgen_futures::JsFuture::from(promise);
+        let resolved = future
+            .await
+            .map_err(|e| JsError::new(&format!("pay_invoice promise rejected: {e:?}")))?;
+
+        // Extract fields from the payment result object
+        let preimage = js_sys::Reflect::get(&resolved, &JsValue::from_str("preimage"))
+            .ok()
+            .and_then(|v| v.as_string())
+            .ok_or_else(|| JsError::new("payment result missing preimage"))?;
+        let payment_hash = js_sys::Reflect::get(&resolved, &JsValue::from_str("paymentHash"))
+            .ok()
+            .and_then(|v| v.as_string())
+            .ok_or_else(|| JsError::new("payment result missing paymentHash"))?;
+        let amount_sats = js_sys::Reflect::get(&resolved, &JsValue::from_str("amountSats"))
+            .ok()
+            .and_then(|v| v.as_f64())
+            .map_or(0, |n| n as u64);
+        let fee_sats = js_sys::Reflect::get(&resolved, &JsValue::from_str("feeSats"))
+            .ok()
+            .and_then(|v| v.as_f64())
+            .map_or(0, |n| n as u64);
+
+        Ok(WasmPaymentResult::new(
+            preimage,
+            payment_hash,
+            amount_sats,
+            fee_sats,
+        ))
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests (native, not WASM — see tests/web.rs for wasm_bindgen_test)
 // ---------------------------------------------------------------------------
 
