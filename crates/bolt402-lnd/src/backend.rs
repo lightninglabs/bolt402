@@ -1,4 +1,4 @@
-//! LND gRPC backend implementation using vendored protos.
+//! LND backend implementation using vendored gRPC protos.
 
 use std::fmt;
 
@@ -8,11 +8,41 @@ use bolt402_core::port::{LnBackend, NodeInfo, PaymentResult};
 use tonic::Request;
 use tonic::transport::{Certificate, Channel, ClientTlsConfig};
 
-use crate::error::LndError;
 use crate::lnrpc;
 use crate::lnrpc::lightning_client::LightningClient;
 use crate::routerrpc;
 use crate::routerrpc::router_client::RouterClient;
+
+/// Error type specific to the LND backend.
+#[derive(Debug, thiserror::Error)]
+pub enum LndError {
+    /// gRPC connection or transport error.
+    #[error("LND transport error: {0}")]
+    Transport(#[from] tonic::transport::Error),
+
+    /// gRPC call returned an error status.
+    #[error("LND gRPC error: {0}")]
+    Rpc(#[from] tonic::Status),
+
+    /// Failed to read TLS certificate or macaroon file.
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    /// Payment failed with a specific reason.
+    #[error("payment failed: {0}")]
+    Payment(String),
+}
+
+impl From<LndError> for ClientError {
+    fn from(err: LndError) -> Self {
+        match err {
+            LndError::Payment(reason) => ClientError::PaymentFailed { reason },
+            other => ClientError::Backend {
+                reason: other.to_string(),
+            },
+        }
+    }
+}
 
 /// Type alias for an intercepted gRPC channel with macaroon auth.
 type LndChannel = tonic::service::interceptor::InterceptedService<Channel, MacaroonInterceptor>;
@@ -22,15 +52,15 @@ type LndChannel = tonic::service::interceptor::InterceptedService<Channel, Macar
 /// Connects to an LND node using TLS and macaroon authentication,
 /// then implements the [`LnBackend`] trait for invoice payments.
 /// Uses `SendPaymentV2` from the router RPC for payment execution.
-pub struct LndGrpcBackend {
+pub struct LndBackend {
     client: LightningClient<LndChannel>,
     router: RouterClient<LndChannel>,
     address: String,
 }
 
-impl fmt::Debug for LndGrpcBackend {
+impl fmt::Debug for LndBackend {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("LndGrpcBackend")
+        f.debug_struct("LndBackend")
             .field("address", &self.address)
             .finish_non_exhaustive()
     }
@@ -54,7 +84,7 @@ impl tonic::service::Interceptor for MacaroonInterceptor {
     }
 }
 
-impl LndGrpcBackend {
+impl LndBackend {
     /// Connect to an LND node.
     ///
     /// # Arguments
@@ -116,7 +146,7 @@ impl LndGrpcBackend {
 }
 
 #[async_trait]
-impl LnBackend for LndGrpcBackend {
+impl LnBackend for LndBackend {
     async fn pay_invoice(
         &self,
         bolt11: &str,
