@@ -206,8 +206,8 @@ cargo doc --no-deps  # Build docs
 
 ### Upcoming
 
-- [ ] Remove backwards-compat re-exports from bolt402-core (#64)
-- [ ] Align all crates, examples, and tutorials with proto/core split (#65)
+- [x] Remove backwards-compat re-exports from bolt402-core (#64)
+- [x] Align all crates, examples, and tutorials with proto/core split (#65)
 - [ ] Node.js/TypeScript integration tests for bolt402-wasm (#66)
 - [ ] MPP (Tempo) protocol support (#67)
 - [ ] CLN REST backend adapter

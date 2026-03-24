@@ -74,7 +74,7 @@ pub enum SwissKnifeError {
 }
 ```
 
-All variants convert to `bolt402_core::ClientError` via `From` impl:
+All variants convert to `bolt402_proto::ClientError` via `From` impl:
 - `Payment` → `ClientError::PaymentFailed`
 - `Auth` → `ClientError::Backend` (with auth context)
 - Others → `ClientError::Backend`
@@ -82,16 +82,16 @@ All variants convert to `bolt402_core::ClientError` via `From` impl:
 ### Dependency Graph
 
 ```
-bolt402-proto
+bolt402-proto  ← bolt402-swissknife (new)
      ↑
-bolt402-core  ← bolt402-swissknife (new)
+bolt402-core
      ↑
 bolt402-lnd
 ```
 
-`bolt402-swissknife` depends only on `bolt402-core` (for the `LnBackend` trait
-and error types). No dependency on `bolt402-proto` directly since the backend
-doesn't need to parse L402 challenges.
+`bolt402-swissknife` depends only on `bolt402-proto` (for the `LnBackend` trait
+and error types). No dependency on `bolt402-core` since the backend
+doesn't need the L402 client engine.
 
 ## Alternatives Considered
 

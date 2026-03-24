@@ -46,7 +46,7 @@ Renamed from `lnpay` (name already taken by other projects). Full original propo
 - [x] Project renamed to bolt402
 - [x] Workspace scaffold created
 - [x] bolt402-proto: L402 challenge parsing, token construction, error types
-- [x] bolt402-core: LnBackend/TokenStore ports, budget tracker, in-memory cache, receipt logger, error types
+- [x] bolt402-core: L402 client engine, budget tracker, in-memory cache, receipt logger (ports/traits live in bolt402-proto)
 - [x] GitHub repository created (github.com/bitcoin-numeraire/bolt402)
 - [x] AGENTS.md, CLAUDE.md, README.md at repo root
 - [x] Daily cron job (bolt402-development, 14:00 UTC)

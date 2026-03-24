@@ -96,7 +96,7 @@ let client = L402Client::builder()
 // This will fail if the invoice amount exceeds 500 sats
 match client.get("https://expensive-api.com/data").await {
     Ok(response) => println!("Got data: {}", response.status()),
-    Err(bolt402_core::ClientError::BudgetExceeded { reason }) => {
+    Err(bolt402_proto::ClientError::BudgetExceeded { reason }) => {
         println!("Payment blocked: {reason}");
     }
     Err(e) => println!("Other error: {e}"),

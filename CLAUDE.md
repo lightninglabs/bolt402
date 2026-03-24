@@ -27,7 +27,7 @@ Hexagonal / Clean Architecture. Read `AGENTS.md` for the full breakdown.
 ### Rust Crates
 
 - `bolt402-proto`: Protocol types (L402Challenge, L402Token, L402Error). No internal deps.
-- `bolt402-core`: Client engine, ports (LnBackend, TokenStore traits), adapters (InMemoryTokenStore, BudgetTracker, Receipt).
+- `bolt402-core`: Client engine (L402Client), adapters (InMemoryTokenStore, BudgetTracker, Receipt). Depends on `bolt402-proto` for port traits.
 - `bolt402-lnd`: LND gRPC adapter (implements LnBackend).
 - `bolt402-cln`: CLN (Core Lightning) gRPC adapter (implements LnBackend).
 - `bolt402-nwc`: Nostr Wallet Connect (NIP-47) adapter (implements LnBackend).

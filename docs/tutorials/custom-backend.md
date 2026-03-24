@@ -8,8 +8,8 @@ The `LnBackend` trait is the port that defines how bolt402 pays invoices:
 
 ```rust
 use async_trait::async_trait;
-use bolt402_core::port::{LnBackend, PaymentResult, NodeInfo};
-use bolt402_core::ClientError;
+use bolt402_proto::port::{LnBackend, PaymentResult, NodeInfo};
+use bolt402_proto::ClientError;
 
 #[async_trait]
 pub trait LnBackend: Send + Sync {
@@ -52,7 +52,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-bolt402-core = { workspace = true }
+bolt402-proto = { workspace = true }
 async-trait = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
@@ -63,8 +63,8 @@ tokio = { workspace = true }
 ### Step 2: Define the Backend Struct
 
 ```rust
-use bolt402_core::port::{LnBackend, PaymentResult, NodeInfo};
-use bolt402_core::ClientError;
+use bolt402_proto::port::{LnBackend, PaymentResult, NodeInfo};
+use bolt402_proto::ClientError;
 use async_trait::async_trait;
 
 /// Core Lightning backend using the JSON-RPC interface.

@@ -44,7 +44,7 @@ Single table, `endpoint` as primary key (matching `InMemoryTokenStore` semantics
 ### API
 
 ```rust
-use bolt402_core::port::TokenStore;
+use bolt402_proto::port::TokenStore;
 
 pub struct SqliteTokenStore { /* ... */ }
 
@@ -165,6 +165,6 @@ fn migrate(conn: &Connection) -> Result<(), SqliteStoreError> {
 ## Dependencies
 
 - `rusqlite` (with `bundled` feature for zero-system-dependency builds)
-- `bolt402-core` (for `TokenStore` trait and `ClientError`)
+- `bolt402-proto` (for `TokenStore` trait and `ClientError`)
 - `tokio` (for `spawn_blocking`)
 - `thiserror` (for error types)

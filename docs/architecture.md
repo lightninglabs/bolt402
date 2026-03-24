@@ -30,7 +30,7 @@ bolt402-lnd  bolt402-  │  bolt402-  bolt402-    bolt402-wasm
 | Crate | Role |
 |-------|------|
 | `bolt402-proto` | Shared protocol types: `L402Challenge`, `L402Token`, `L402Error`, `ClientError`. **Also owns all port traits** (`LnBackend`, `TokenStore`) and shared domain types (`PaymentResult`, `NodeInfo`). No async runtime dependency (no tokio). WASM-safe. |
-| `bolt402-core` | The L402 client engine. Contains `L402Client` (HTTP orchestration with reqwest), `BudgetTracker`, `InMemoryTokenStore`, and `Receipt`. Re-exports ports from `bolt402-proto`. |
+| `bolt402-core` | The L402 client engine. Contains `L402Client` (HTTP orchestration with reqwest), `BudgetTracker`, `InMemoryTokenStore`, and `Receipt`. Depends on `bolt402-proto` for port traits and shared types. |
 | `bolt402-lnd` | Implements `LnBackend` for LND. Two feature-gated backends: `grpc` (tonic, requires tokio) and `rest` (reqwest, WASM-compatible). Depends on `bolt402-proto` only. |
 | `bolt402-cln` | Implements `LnBackend` for Core Lightning (CLN) via gRPC with mTLS. |
 | `bolt402-nwc` | Implements `LnBackend` for Nostr Wallet Connect (NIP-47). |

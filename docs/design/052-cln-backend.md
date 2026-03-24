@@ -15,7 +15,7 @@ bolt402 currently supports LND, NWC, and SwissKnife as Lightning backends. Core 
 
 Follows the same adapter pattern as `bolt402-lnd`:
 
-- Implements `LnBackend` trait from `bolt402-core`
+- Implements `LnBackend` trait from `bolt402-proto`
 - Uses CLN's gRPC interface via `tonic` with vendored proto files
 - Supports mTLS authentication (client certificate + CA certificate)
 - Provides `ClnBackend::connect()` and `ClnBackend::from_env()` constructors
@@ -23,7 +23,7 @@ Follows the same adapter pattern as `bolt402-lnd`:
 ### Architecture
 
 ```
-bolt402-core (LnBackend trait)
+bolt402-proto (LnBackend trait)
       ↑
 bolt402-cln (ClnBackend struct)
       ↑
