@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use bolt402_proto::ClientError;
 use bolt402_proto::port::{LnBackend, NodeInfo, PaymentResult};
 use reqwest::Client as HttpClient;
-use reqwest::header::{AUTHORIZATION, HeaderValue};
+use reqwest::header::HeaderValue;
 
 use crate::types::{
     BalanceResponse, ErrorResponse, PaymentStatus, SendPaymentRequest, WalletResponse,
@@ -136,20 +136,18 @@ impl SwissKnifeBackend {
     /// Build an authenticated request to the SwissKnife API.
     fn request(&self, method: reqwest::Method, path: &str) -> reqwest::RequestBuilder {
         let url = format!("{}{path}", self.base_url);
-        let auth_value = format!("Bearer {}", self.api_key);
 
         self.client.request(method, &url).header(
-            AUTHORIZATION,
-            HeaderValue::from_str(&auth_value).expect("API key contains invalid header characters"),
+            "Api-Key",
+            HeaderValue::from_str(&self.api_key)
+                .expect("API key contains invalid header characters"),
         )
     }
 
     /// Parse an error response from the SwissKnife API.
     async fn parse_error(status: u16, response: reqwest::Response) -> SwissKnifeError {
         let message = match response.json::<ErrorResponse>().await {
-            Ok(err) => err
-                .message
-                .unwrap_or_else(|| format!("HTTP {status} error")),
+            Ok(err) => err.reason.unwrap_or_else(|| format!("HTTP {status} error")),
             Err(_) => format!("HTTP {status} error"),
         };
 
@@ -211,11 +209,7 @@ impl LnBackend for SwissKnifeBackend {
             }
         }
 
-        let ln_details = payment.lightning.ok_or_else(|| {
-            SwissKnifeError::Payment("settled payment missing Lightning details".to_string())
-        })?;
-
-        let preimage = ln_details.payment_preimage.ok_or_else(|| {
+        let preimage = payment.payment_preimage.ok_or_else(|| {
             SwissKnifeError::Payment("settled payment missing preimage".to_string())
         })?;
 
@@ -234,7 +228,7 @@ impl LnBackend for SwissKnifeBackend {
 
         Ok(PaymentResult {
             preimage,
-            payment_hash: ln_details.payment_hash,
+            payment_hash: payment.payment_hash.unwrap_or_default(),
             amount_sats,
             fee_sats,
         })

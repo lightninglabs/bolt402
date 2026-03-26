@@ -123,8 +123,34 @@ services:
       retries: 30
       start_period: 15s
 
+  # SwissKnife: Numeraire's custodial Lightning wallet.
+  # Connected to CLN via clnrest as the Lightning provider.
+  # Provides REST API for bolt402-swissknife backend tests.
+  swissknife:
+    image: bitcoinnumeraire/swissknife-server:0.1.7
+    restart: unless-stopped
+    depends_on:
+      cln:
+        condition: service_healthy
+    environment:
+      RUN_MODE: production
+      SWISSKNIFE_JWT__SECRET: "bolt402-regtest-jwt-secret-do-not-use-in-production"
+      SWISSKNIFE_CLN_REST_CONFIG__RUNE: "${CLN_RUNE:-}"
+    volumes:
+      - ./swissknife/regtest.toml:/config/production.toml:ro
+      - swissknife-data:/storage
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3000/v1/system/health || wget -q -O- http://127.0.0.1:3000/v1/system/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+
 volumes:
   bitcoind-data:
   lnd-alice-data:
   lnd-bob-data:
   cln-data:
+  swissknife-data:

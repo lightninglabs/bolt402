@@ -16,19 +16,48 @@ jobs:
   regtest:
     name: Regtest (L402 end-to-end)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
 
       - name: Install protobuf compiler
         run: sudo apt-get install -y protobuf-compiler
 
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
+        with:
+          python-version: '3.12'
+
       - name: Compile regtest tests (without running)
         run: cargo test -p bolt402-regtest --no-run
+
+      - name: Build WASM package
+        run: wasm-pack build crates/bolt402-wasm --target web
+
+      - name: Install WASM Node.js test dependencies
+        working-directory: crates/bolt402-wasm/tests/node
+        run: |
+          corepack enable
+          yarn install --no-immutable
+
+      - name: Build Python bindings
+        working-directory: crates/bolt402-python
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install maturin pytest
+          .venv/bin/maturin develop
 
       - name: Start Docker services
         run: make regtest-up
@@ -60,10 +89,20 @@ jobs:
           timeout 60 bash -c "until wget -S -O /dev/null http://localhost:8081/health 2>&1 | grep -q 'HTTP/'; do sleep 3; done"
           echo "Aperture ready."
 
-      - name: Run regtest integration tests
+      - name: Run Rust regtest integration tests
         run: make regtest-test
         env:
           RUST_LOG: info
+
+      - name: Run WASM/Node.js regtest integration tests
+        working-directory: crates/bolt402-wasm/tests/node
+        run: yarn vitest run tests/regtest.test.ts
+        env:
+          NODE_TLS_REJECT_UNAUTHORIZED: "0"
+
+      - name: Run Python regtest integration tests
+        working-directory: crates/bolt402-python
+        run: .venv/bin/pytest tests/test_regtest.py -v
 
       - name: Docker logs (on failure)
         if: failure()

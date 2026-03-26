@@ -193,6 +193,33 @@ pub async fn cln_rest_backend() -> Option<bolt402_cln::ClnRestBackend> {
     }
 }
 
+/// Create a `SwissKnifeBackend` from regtest environment.
+///
+/// Returns `None` if SwissKnife is not configured or not reachable.
+pub async fn swissknife_backend() -> Option<bolt402_swissknife::SwissKnifeBackend> {
+    let url = std::env::var("SWISSKNIFE_API_URL").ok()?;
+    let api_key = std::env::var("SWISSKNIFE_API_KEY").ok()?;
+
+    if url.is_empty() || api_key.is_empty() {
+        tracing::warn!("SwissKnife credentials not available, skipping SwissKnife tests");
+        return None;
+    }
+
+    let backend = bolt402_swissknife::SwissKnifeBackend::new(&url, &api_key);
+
+    // Verify connectivity
+    match bolt402_proto::LnBackend::get_info(&backend).await {
+        Ok(info) => {
+            tracing::info!("Connected to SwissKnife: {}", info.alias);
+            Some(backend)
+        }
+        Err(e) => {
+            tracing::warn!("Failed to connect to SwissKnife: {e}");
+            None
+        }
+    }
+}
+
 /// Build an `L402Client` with the given backend, unlimited budget, in-memory cache.
 pub fn build_l402_client<B: LnBackend + 'static>(backend: B) -> L402Client {
     L402Client::builder()

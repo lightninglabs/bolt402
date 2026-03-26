@@ -25,26 +25,18 @@ pub(crate) struct PaymentResponse {
     /// Payment status.
     pub status: PaymentStatus,
 
-    /// Lightning-specific payment details.
-    pub lightning: Option<LnPaymentDetails>,
+    /// Hex-encoded payment hash.
+    pub payment_hash: Option<String>,
+
+    /// Hex-encoded payment preimage (proof of payment).
+    pub payment_preimage: Option<String>,
 
     /// Error message (populated when status is Failed).
     pub error: Option<String>,
 }
 
-/// Lightning-specific fields within a payment response.
-#[derive(Debug, Deserialize)]
-pub(crate) struct LnPaymentDetails {
-    /// Hex-encoded payment hash.
-    pub payment_hash: String,
-
-    /// Hex-encoded payment preimage (proof of payment).
-    pub payment_preimage: Option<String>,
-}
-
 /// Payment status from SwissKnife.
 #[derive(Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub(crate) enum PaymentStatus {
     /// Payment completed successfully.
     Settled,
@@ -78,12 +70,10 @@ pub(crate) struct WalletResponse {
 /// Error response from the SwissKnife API.
 #[derive(Debug, Deserialize)]
 pub(crate) struct ErrorResponse {
-    /// Human-readable error message.
-    pub message: Option<String>,
+    /// Human-readable error reason.
+    pub reason: Option<String>,
 
-    /// Error status string (e.g. "UNAUTHORIZED", "NOT_FOUND").
-    /// Kept for completeness with the API contract; `message` is the
-    /// primary field used for error reporting.
+    /// Error status string (e.g. "401 Unauthorized").
     #[allow(dead_code)]
     pub status: Option<String>,
 }
@@ -98,25 +88,21 @@ mod tests {
             "id": "a1b2c3d4-0000-0000-0000-000000000000",
             "wallet_id": "w1w2w3w4-0000-0000-0000-000000000000",
             "amount_msat": 100000,
-            "fee_msat": 1000,
-            "currency": "BTC",
-            "ledger": "LIGHTNING",
-            "status": "SETTLED",
+            "fee_msat": 0,
+            "currency": "Regtest",
+            "ledger": "Lightning",
+            "status": "Settled",
             "created_at": "2026-03-15T14:00:00Z",
-            "lightning": {
-                "payment_hash": "abcdef1234567890",
-                "payment_preimage": "fedcba0987654321"
-            }
+            "payment_hash": "abcdef1234567890",
+            "payment_preimage": "fedcba0987654321"
         }"#;
 
         let resp: PaymentResponse = serde_json::from_str(json).unwrap();
         assert_eq!(resp.amount_msat, 100_000);
-        assert_eq!(resp.fee_msat, Some(1000));
+        assert_eq!(resp.fee_msat, Some(0));
         assert_eq!(resp.status, PaymentStatus::Settled);
-
-        let ln = resp.lightning.unwrap();
-        assert_eq!(ln.payment_hash, "abcdef1234567890");
-        assert_eq!(ln.payment_preimage.unwrap(), "fedcba0987654321");
+        assert_eq!(resp.payment_hash.unwrap(), "abcdef1234567890");
+        assert_eq!(resp.payment_preimage.unwrap(), "fedcba0987654321");
     }
 
     #[test]
@@ -125,9 +111,9 @@ mod tests {
             "id": "a1b2c3d4-0000-0000-0000-000000000000",
             "wallet_id": "w1w2w3w4-0000-0000-0000-000000000000",
             "amount_msat": 0,
-            "status": "FAILED",
-            "currency": "BTC",
-            "ledger": "LIGHTNING",
+            "status": "Failed",
+            "currency": "Regtest",
+            "ledger": "Lightning",
             "error": "no route found",
             "created_at": "2026-03-15T14:00:00Z"
         }"#;
@@ -154,9 +140,9 @@ mod tests {
 
     #[test]
     fn deserialize_error_response() {
-        let json = r#"{ "message": "Unauthorized", "status": "UNAUTHORIZED" }"#;
+        let json = r#"{ "reason": "Unauthorized", "status": "401 Unauthorized" }"#;
         let resp: ErrorResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(resp.message.unwrap(), "Unauthorized");
+        assert_eq!(resp.reason.unwrap(), "Unauthorized");
     }
 
     #[test]
@@ -170,7 +156,7 @@ mod tests {
 
     #[test]
     fn payment_status_unknown_variant() {
-        let json = r#""SOME_NEW_STATUS""#;
+        let json = r#""SomeNewStatus""#;
         let status: PaymentStatus = serde_json::from_str(json).unwrap();
         assert_eq!(status, PaymentStatus::Unknown);
     }

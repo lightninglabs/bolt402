@@ -39,12 +39,17 @@ path = "tests/token_caching.rs"
 name = "sqlite_persistence"
 path = "tests/sqlite_persistence.rs"
 
+[[test]]
+name = "swissknife_flow"
+path = "tests/swissknife_flow.rs"
+
 [dependencies]
 bolt402-proto = { workspace = true }
 bolt402-core = { workspace = true }
 bolt402-lnd = { workspace = true, features = ["grpc", "rest"] }
 bolt402-cln = { workspace = true, features = ["grpc", "rest"] }
 bolt402-sqlite = { workspace = true }
+bolt402-swissknife = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 reqwest = { workspace = true }
 serde_json = { workspace = true }

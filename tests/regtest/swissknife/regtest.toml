@@ -1,0 +1,15 @@
+# SwissKnife regtest overrides (merged with default config).
+# Connects to CLN as the Lightning provider via clnrest.
+
+ln_provider = "clnrest"
+auth_provider = "jwt"
+host = "http://swissknife:3000"
+
+[cln_rest_config]
+endpoint = "https://cln:3010"
+rune = "CHANGE_ME"
+accept_invalid_certs = true
+accept_invalid_hostnames = true
+
+[jwt]
+secret = "bolt402-regtest-jwt-secret-do-not-use-in-production"
