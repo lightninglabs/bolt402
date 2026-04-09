@@ -716,6 +716,25 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@lightninglabs/bolt402-ai@npm:^0.1.0":
+  version: 0.1.0
+  resolution: "@lightninglabs/bolt402-ai@npm:0.1.0"
+  dependencies:
+    "@lightninglabs/bolt402": "npm:^0.1.0"
+  peerDependencies:
+    ai: ">=6.0.0"
+    zod: ^3.25.76 || ^4.1.8
+  checksum: 10c0/3e0789c9c57ebfec10bd1610590e8114842d8199b8176bd3c397fb3f536b690440422f26660926a6f8ed92be91821a327854adfc5886cb43a44bcf85ded640b2
+  languageName: node
+  linkType: hard
+
+"@lightninglabs/bolt402@npm:^0.1.0":
+  version: 0.1.0
+  resolution: "@lightninglabs/bolt402@npm:0.1.0"
+  checksum: 10c0/e19dd17ed9af0f485bac8853660e97bf25bc81830d9decc6eb3eb9c201476ab1ef1cd16e28add3ca047d690b66735445d2273b61d29b95c0b38de4078d2c36ef
+  languageName: node
+  linkType: hard
+
 "@napi-rs/wasm-runtime@npm:^0.2.11":
   version: 0.2.12
   resolution: "@napi-rs/wasm-runtime@npm:0.2.12"
@@ -1699,25 +1718,6 @@ __metadata:
   bin:
     baseline-browser-mapping: dist/cli.cjs
   checksum: 10c0/5221d92d7deeae6f7c6ce90ace8d15ffad50095a92c6ddf0cf826f49717a1afb607de32482447a388df82f4ca89c7c26eaf76fe31f8a2727fe1c09912bcfe184
-  languageName: node
-  linkType: hard
-
-"bolt402-ai-sdk@file:../../packages/bolt402-ai-sdk::locator=l402-explorer%40workspace%3A.":
-  version: 0.1.0
-  resolution: "bolt402-ai-sdk@file:../../packages/bolt402-ai-sdk#../../packages/bolt402-ai-sdk::hash=195fba&locator=l402-explorer%40workspace%3A."
-  dependencies:
-    bolt402-wasm: "file:../../crates/bolt402-wasm/pkg"
-  peerDependencies:
-    ai: ">=6.0.0"
-    zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/46c42b17c341200d8d8356a5afb98a4d2d9211fb217c80f47c2c5ed8dfbbb02c9455128cdcb6554a44161985f8408079dc8159d726e2d0454f1a22a5c6b44f4f
-  languageName: node
-  linkType: hard
-
-"bolt402-wasm@file:../../crates/bolt402-wasm/pkg::locator=bolt402-ai-sdk%40file%3A..%2F..%2Fpackages%2Fbolt402-ai-sdk%23..%2F..%2Fpackages%2Fbolt402-ai-sdk%3A%3Ahash%3D195fba%26locator%3Dl402-explorer%2540workspace%253A.":
-  version: 0.1.0
-  resolution: "bolt402-wasm@file:../../crates/bolt402-wasm/pkg#../../crates/bolt402-wasm/pkg::hash=d72626&locator=bolt402-ai-sdk%40file%3A..%2F..%2Fpackages%2Fbolt402-ai-sdk%23..%2F..%2Fpackages%2Fbolt402-ai-sdk%3A%3Ahash%3D195fba%26locator%3Dl402-explorer%2540workspace%253A."
-  checksum: 10c0/357f1f124d226014813fb1e5f3c68830d6e4063a2f9c3a50a2a893d5f0c48e6384284d7e032383268519548bd84ef52b1e4fa8c63e26914b0a2aa12d95400412
   languageName: node
   linkType: hard
 
@@ -3521,13 +3521,13 @@ __metadata:
     "@ai-sdk/openai": "npm:3.0.41"
     "@ai-sdk/react": "npm:3.0.118"
     "@ai-sdk/xai": "npm:3.0.67"
+    "@lightninglabs/bolt402-ai": "npm:^0.1.0"
     "@tailwindcss/postcss": "npm:^4.2.2"
     "@tailwindcss/typography": "npm:^0.5.19"
     "@types/node": "npm:^25.5.0"
     "@types/react": "npm:^19.2.14"
     "@types/react-dom": "npm:^19.2.3"
     ai: "npm:6.0.116"
-    bolt402-ai-sdk: "file:../../packages/bolt402-ai-sdk"
     eslint: "npm:^9"
     eslint-config-next: "npm:16.2.0"
     next: "npm:16.2.0"
