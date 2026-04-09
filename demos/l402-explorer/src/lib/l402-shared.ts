@@ -8,7 +8,7 @@
  * environment variables. See .env.example for details.
  */
 
-import { WasmL402Client, WasmBudgetConfig } from 'bolt402-ai-sdk';
+import { WasmL402Client, WasmBudgetConfig } from '@lightninglabs/bolt402-ai';
 
 function createClient(): WasmL402Client {
   const backendType = process.env.BACKEND_TYPE;

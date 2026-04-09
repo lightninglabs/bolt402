@@ -7,12 +7,9 @@
  *
  * @example
  * ```typescript
- * import { createBolt402Tools } from 'bolt402-ai-sdk';
+ * import { createBolt402Tools, WasmL402Client, WasmBudgetConfig } from '@lightninglabs/bolt402-ai';
  * import { generateText } from 'ai';
  * import { openai } from '@ai-sdk/openai';
- * import init, { WasmL402Client, WasmBudgetConfig } from 'bolt402-wasm';
- *
- * await init();
  *
  * const client = WasmL402Client.withLndRest(
  *   'https://localhost:8080',
@@ -34,7 +31,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import type { WasmL402Client } from 'bolt402-wasm';
+import type { WasmL402Client } from '@lightninglabs/bolt402';
 
 /** Configuration for creating bolt402 AI SDK tools. */
 export interface Bolt402ToolsConfig {

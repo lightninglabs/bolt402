@@ -137,7 +137,7 @@ bolt402-ai-sdk is linked from `../../packages/bolt402-ai-sdk` via `file:` depend
 The chat API route (`/api/chat`) creates bolt402 tools and passes them to the Vercel AI SDK:
 
 ```typescript
-import { createBolt402Tools, LndBackend } from 'bolt402-ai-sdk';
+import { createBolt402Tools, LndBackend } from '@lightninglabs/bolt402-ai';
 import { streamText } from 'ai';
 
 const tools = createBolt402Tools({

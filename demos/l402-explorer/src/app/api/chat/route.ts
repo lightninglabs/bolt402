@@ -4,7 +4,7 @@ import { Experimental_StdioMCPTransport } from '@ai-sdk/mcp/mcp-stdio';
 import { openai } from '@ai-sdk/openai';
 import { anthropic, createAnthropic } from '@ai-sdk/anthropic';
 import { xai } from '@ai-sdk/xai';
-import { createBolt402Tools } from 'bolt402-ai-sdk';
+import { createBolt402Tools } from '@lightninglabs/bolt402-ai';
 import { getSharedL402Client } from '@/lib/l402-shared';
 
 // ---------------------------------------------------------------------------

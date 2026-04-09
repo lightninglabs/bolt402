@@ -49,7 +49,7 @@
     "zod": "^3.25.76 || ^4.1.8"
   },
   "dependencies": {
-    "bolt402-wasm": "file:../../crates/bolt402-wasm/pkg"
+    "@lightninglabs/bolt402": "^0.1.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

@@ -7,12 +7,9 @@
  *
  * @example
  * ```typescript
- * import { createBolt402Tools } from 'bolt402-ai-sdk';
- * import init, { WasmL402Client, WasmBudgetConfig } from 'bolt402-wasm';
+ * import { createBolt402Tools, WasmL402Client, WasmBudgetConfig } from '@lightninglabs/bolt402-ai';
  * import { generateText } from 'ai';
  * import { openai } from '@ai-sdk/openai';
- *
- * await init();
  *
  * const client = WasmL402Client.withLndRest(
  *   'https://localhost:8080',
@@ -44,4 +41,4 @@ export {
   WasmReceipt,
   WasmLndRestBackend,
   WasmSwissKnifeBackend,
-} from 'bolt402-wasm';
+} from '@lightninglabs/bolt402';
