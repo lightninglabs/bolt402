@@ -36,7 +36,7 @@ jobs:
       - name: Install protobuf compiler (Windows)
         if: runner.os == 'Windows'
         run: choco install protoc -y
-      - uses: PyO3/maturin-action@aef21716674fc6e0e0e50e6e8340bacd1026233a # v1
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           target: ${{ matrix.target }}
           args: --release --out dist
@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           ref: ${{ github.sha }}
-      - uses: PyO3/maturin-action@aef21716674fc6e0e0e50e6e8340bacd1026233a # v1
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           command: sdist
           args: --out dist
