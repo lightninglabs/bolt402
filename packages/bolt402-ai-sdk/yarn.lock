@@ -214,9 +214,9 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@lightninglabs/bolt402-ai@workspace:."
   dependencies:
+    "@lightninglabs/bolt402": "npm:^0.1.0"
     "@types/node": "npm:^25.5.0"
     ai: "npm:^6.0.116"
-    bolt402-wasm: "file:../../crates/bolt402-wasm/pkg"
     eslint: "npm:^9.0.0"
     prettier: "npm:^3.8.1"
     typescript: "npm:^5.9.3"
@@ -227,6 +227,13 @@ __metadata:
     zod: ^3.25.76 || ^4.1.8
   languageName: unknown
   linkType: soft
+
+"@lightninglabs/bolt402@npm:^0.1.0":
+  version: 0.1.0
+  resolution: "@lightninglabs/bolt402@npm:0.1.0"
+  checksum: 10c0/e19dd17ed9af0f485bac8853660e97bf25bc81830d9decc6eb3eb9c201476ab1ef1cd16e28add3ca047d690b66735445d2273b61d29b95c0b38de4078d2c36ef
+  languageName: node
+  linkType: hard
 
 "@napi-rs/wasm-runtime@npm:^1.1.1":
   version: 1.1.1
@@ -633,13 +640,6 @@ __metadata:
   version: 4.0.4
   resolution: "balanced-match@npm:4.0.4"
   checksum: 10c0/07e86102a3eb2ee2a6a1a89164f29d0dbaebd28f2ca3f5ca786f36b8b23d9e417eb3be45a4acf754f837be5ac0a2317de90d3fcb7f4f4dc95720a1f36b26a17b
-  languageName: node
-  linkType: hard
-
-"bolt402-wasm@file:../../crates/bolt402-wasm/pkg::locator=%40lightninglabs%2Fbolt402-ai%40workspace%3A.":
-  version: 0.1.0
-  resolution: "bolt402-wasm@file:../../crates/bolt402-wasm/pkg#../../crates/bolt402-wasm/pkg::hash=cce293&locator=%40lightninglabs%2Fbolt402-ai%40workspace%3A."
-  checksum: 10c0/5d740a22937d6460fb5943477dc0c45781e0058261dbb4039a1dbddf87dab70007e9930d1477133d8ce53a00f705b7941c87eab657f0bbe890e784562fcd5708
   languageName: node
   linkType: hard
 

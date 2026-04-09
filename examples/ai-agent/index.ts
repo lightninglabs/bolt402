@@ -9,14 +9,11 @@
 
 import { generateText, stepCountIs } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { createBolt402Tools } from 'bolt402-ai-sdk';
-import init, { WasmBudgetConfig, WasmL402Client } from 'bolt402-wasm';
+import { createBolt402Tools, WasmBudgetConfig, WasmL402Client } from '@lightninglabs/bolt402-ai';
 
 async function main() {
   console.log('bolt402 AI Agent Example');
   console.log('========================\n');
-
-  await init();
 
   // Step 1: Configure the Lightning client
   const client = WasmL402Client.withLndRest(
