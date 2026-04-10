@@ -7,8 +7,10 @@ Requires: pip install bolt402 (or maturin develop)
 import bolt402
 from bolt402 import (
     Budget,
+    ClnGrpcBackend,
     ClnRestBackend,
     L402Client,
+    LndGrpcBackend,
     LndRestBackend,
     NodeInfo,
     PaymentResult,
@@ -122,8 +124,10 @@ class TestExports:
 
     def test_all_classes_importable(self):
         assert Budget is not None
+        assert ClnGrpcBackend is not None
         assert ClnRestBackend is not None
         assert L402Client is not None
+        assert LndGrpcBackend is not None
         assert LndRestBackend is not None
         assert NodeInfo is not None
         assert PaymentResult is not None
@@ -136,9 +140,11 @@ class TestExports:
     def test_all_exports(self):
         expected = {
             "Budget",
+            "ClnGrpcBackend",
             "ClnRestBackend",
             "L402Client",
             "L402Response",
+            "LndGrpcBackend",
             "LndRestBackend",
             "NodeInfo",
             "PaymentResult",

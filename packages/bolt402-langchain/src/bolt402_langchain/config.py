@@ -17,25 +17,36 @@ def create_l402_client(
     backend: str,
     url: str,
     macaroon: Optional[str] = None,
+    tls_cert_path: Optional[str] = None,
+    macaroon_path: Optional[str] = None,
     rune: Optional[str] = None,
+    ca_cert_path: Optional[str] = None,
+    client_cert_path: Optional[str] = None,
+    client_key_path: Optional[str] = None,
     api_key: Optional[str] = None,
     budget: Optional[Union[Budget, dict[str, Any]]] = None,
     max_fee_sats: int = 100,
 ) -> L402Client:
     """Create a configured L402 client for use with LangChain tools.
 
-    Factory function that simplifies client creation. Supports LND REST,
-    CLN REST, and SwissKnife backends.
+    Factory function that simplifies client creation. Supports LND
+    (gRPC + REST), CLN (gRPC + REST), and SwissKnife backends.
 
     Args:
-        backend: Lightning backend type. One of ``"lnd"``, ``"cln"``,
-            or ``"swissknife"``.
-        url: Backend API URL (e.g. ``https://localhost:8080`` for LND).
+        backend: Lightning backend type. One of ``"lnd"``, ``"lnd-grpc"``,
+            ``"cln"``, ``"cln-grpc"``, or ``"swissknife"``.
+        url: Backend API URL.
         macaroon: Hex-encoded admin macaroon. Required for ``"lnd"``
-            backend.
-        rune: Rune token string. Required for ``"cln"`` backend.
-        api_key: API key for authentication. Required for
-            ``"swissknife"`` backend.
+            (REST) backend.
+        tls_cert_path: Path to LND's ``tls.cert``. Required for
+            ``"lnd-grpc"`` backend.
+        macaroon_path: Path to admin macaroon file. Required for
+            ``"lnd-grpc"`` backend.
+        rune: Rune token string. Required for ``"cln"`` (REST) backend.
+        ca_cert_path: Path to CA cert. Required for ``"cln-grpc"``.
+        client_cert_path: Path to client cert. Required for ``"cln-grpc"``.
+        client_key_path: Path to client key. Required for ``"cln-grpc"``.
+        api_key: API key. Required for ``"swissknife"`` backend.
         budget: Spending limits. Can be a ``Budget`` instance or a dict
             with keys ``per_request_max``, ``hourly_max``, ``daily_max``,
             ``total_max``.
@@ -74,6 +85,19 @@ def create_l402_client(
             max_fee_sats=max_fee_sats,
         )
 
+    if backend == "lnd-grpc":
+        if not tls_cert_path or not macaroon_path:
+            raise ValueError(
+                "tls_cert_path and macaroon_path are required for LND gRPC backend."
+            )
+        return L402Client.with_lnd_grpc(
+            url,
+            tls_cert_path,
+            macaroon_path,
+            budget=resolved_budget,
+            max_fee_sats=max_fee_sats,
+        )
+
     if backend == "cln":
         if not rune:
             raise ValueError(
@@ -83,6 +107,21 @@ def create_l402_client(
         return L402Client.with_cln_rest(
             url,
             rune,
+            budget=resolved_budget,
+            max_fee_sats=max_fee_sats,
+        )
+
+    if backend == "cln-grpc":
+        if not ca_cert_path or not client_cert_path or not client_key_path:
+            raise ValueError(
+                "ca_cert_path, client_cert_path, and client_key_path are required "
+                "for CLN gRPC backend."
+            )
+        return L402Client.with_cln_grpc(
+            url,
+            ca_cert_path,
+            client_cert_path,
+            client_key_path,
             budget=resolved_budget,
             max_fee_sats=max_fee_sats,
         )
@@ -102,7 +141,7 @@ def create_l402_client(
 
     raise ValueError(
         f"Unsupported backend: {backend!r}. "
-        f"Supported: 'lnd', 'cln', 'swissknife'."
+        f"Supported: 'lnd', 'lnd-grpc', 'cln', 'cln-grpc', 'swissknife'."
     )
 
 

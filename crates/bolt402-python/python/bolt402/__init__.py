@@ -4,13 +4,18 @@ Pay for APIs with Lightning. Built in Rust, available in Python.
 
 Backends::
 
-    from bolt402 import LndRestBackend, ClnRestBackend, SwissKnifeBackend
+    from bolt402 import LndGrpcBackend, LndRestBackend, ClnGrpcBackend, ClnRestBackend, SwissKnifeBackend
 
-    # LND
+    # LND (gRPC)
+    lnd = LndGrpcBackend("https://localhost:10009", "/path/to/tls.cert", "/path/to/admin.macaroon")
+
+    # LND (REST)
     lnd = LndRestBackend("https://localhost:8080", "deadbeef...")
-    info = lnd.get_info()
 
-    # CLN (rune)
+    # CLN (gRPC, mTLS)
+    cln = ClnGrpcBackend("https://localhost:9736", "/path/to/ca.pem", "/path/to/client.pem", "/path/to/client-key.pem")
+
+    # CLN (REST, rune)
     cln = ClnRestBackend("https://localhost:3001", "rune_token...")
 
     # SwissKnife
@@ -35,16 +40,20 @@ Classes:
     L402Response: Response from an L402-aware request.
     PaymentResult: Result of a Lightning payment.
     NodeInfo: Information about a Lightning node.
+    LndGrpcBackend: LND gRPC backend.
     LndRestBackend: LND REST API backend.
+    ClnGrpcBackend: CLN gRPC backend (mTLS).
     ClnRestBackend: CLN REST API backend.
     SwissKnifeBackend: SwissKnife REST API backend.
 """
 
 from bolt402._bolt402 import (
     Budget,
+    ClnGrpcBackend,
     ClnRestBackend,
     L402Client,
     L402Response,
+    LndGrpcBackend,
     LndRestBackend,
     NodeInfo,
     PaymentResult,
@@ -54,9 +63,11 @@ from bolt402._bolt402 import (
 
 __all__ = [
     "Budget",
+    "ClnGrpcBackend",
     "ClnRestBackend",
     "L402Client",
     "L402Response",
+    "LndGrpcBackend",
     "LndRestBackend",
     "NodeInfo",
     "PaymentResult",

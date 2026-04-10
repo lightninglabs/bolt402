@@ -6,19 +6,20 @@
 //! frameworks (`LangChain`, `CrewAI`, `AutoGen`, `LlamaIndex`) to use
 //! L402-gated APIs with Lightning payments.
 //!
-//! Supports LND REST, CLN REST, and `SwissKnife` backends.
+//! Supports LND (gRPC + REST), CLN (gRPC + REST), and `SwissKnife` backends.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
-use bolt402_cln::ClnRestBackend;
+use bolt402_cln::{ClnGrpcBackend, ClnRestBackend};
 use bolt402_core::budget::Budget as RustBudget;
 use bolt402_core::cache::InMemoryTokenStore;
 use bolt402_core::receipt::Receipt as RustReceipt;
 use bolt402_core::{L402Client as RustClient, L402ClientConfig};
-use bolt402_lnd::LndRestBackend;
+use bolt402_lnd::{LndGrpcBackend, LndRestBackend};
 use bolt402_proto::{LnBackend, NodeInfo, PaymentResult};
 use bolt402_swissknife::SwissKnifeBackend;
 
@@ -30,6 +31,10 @@ fn get_runtime() -> &'static tokio::runtime::Runtime {
     use std::sync::OnceLock;
     static RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
     RT.get_or_init(|| {
+        // Install rustls crypto provider (needed for gRPC TLS).
+        // Ignore errors if already installed by another thread.
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
         tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
@@ -371,6 +376,84 @@ impl PyLndRestBackend {
     }
 }
 
+/// LND gRPC backend for Lightning payments.
+///
+/// Connects to an LND node via its gRPC interface (default port 10009).
+/// Authenticated with TLS certificates and admin macaroon.
+///
+/// Example::
+///
+///     from bolt402 import LndGrpcBackend
+///
+///     backend = LndGrpcBackend("https://localhost:10009", "/path/to/tls.cert", "/path/to/admin.macaroon")
+///     info = backend.get_info()
+///     print(info.alias)
+#[pyclass(name = "LndGrpcBackend", from_py_object)]
+#[derive(Debug, Clone)]
+struct PyLndGrpcBackend {
+    inner: Arc<LndGrpcBackend>,
+}
+
+#[pymethods]
+impl PyLndGrpcBackend {
+    /// Create a new LND gRPC backend.
+    ///
+    /// Args:
+    ///     address: LND gRPC address (e.g. ``https://localhost:10009``)
+    ///     tls_cert_path: Path to LND's ``tls.cert`` file
+    ///     macaroon_path: Path to an admin macaroon file
+    #[new]
+    fn new(address: &str, tls_cert_path: &str, macaroon_path: &str) -> PyResult<Self> {
+        let rt = get_runtime();
+        let backend = rt
+            .block_on(LndGrpcBackend::connect(
+                address,
+                tls_cert_path,
+                macaroon_path,
+            ))
+            .map_err(|e| PyRuntimeError::new_err(format!("failed to connect to LND gRPC: {e}")))?;
+        Ok(Self {
+            inner: Arc::new(backend),
+        })
+    }
+
+    /// Pay a BOLT11 Lightning invoice.
+    fn pay_invoice(&self, bolt11: &str, max_fee_sats: u64) -> PyResult<PyPaymentResult> {
+        let rt = get_runtime();
+        let inner = Arc::clone(&self.inner);
+        let bolt11 = bolt11.to_string();
+        let result = rt.block_on(async move { inner.pay_invoice(&bolt11, max_fee_sats).await });
+        match result {
+            Ok(r) => Ok(PyPaymentResult { inner: r }),
+            Err(e) => Err(PyRuntimeError::new_err(format!("payment failed: {e}"))),
+        }
+    }
+
+    /// Get the current spendable balance in satoshis.
+    fn get_balance(&self) -> PyResult<u64> {
+        let rt = get_runtime();
+        let inner = self.inner.clone();
+        rt.block_on(async move { inner.get_balance().await })
+            .map_err(|e| PyRuntimeError::new_err(format!("get_balance failed: {e}")))
+    }
+
+    /// Get information about the connected Lightning node.
+    fn get_info(&self) -> PyResult<PyNodeInfo> {
+        let rt = get_runtime();
+        let inner = self.inner.clone();
+        let result = rt.block_on(async move { inner.get_info().await });
+        match result {
+            Ok(info) => Ok(PyNodeInfo { inner: info }),
+            Err(e) => Err(PyRuntimeError::new_err(format!("get_info failed: {e}"))),
+        }
+    }
+
+    #[allow(clippy::unused_self)]
+    fn __repr__(&self) -> String {
+        "LndGrpcBackend(...)".to_string()
+    }
+}
+
 /// CLN REST backend for Lightning payments.
 ///
 /// Connects to a Core Lightning node via the CLN REST interface.
@@ -449,6 +532,95 @@ impl PyClnRestBackend {
     #[allow(clippy::unused_self)]
     fn __repr__(&self) -> String {
         "ClnRestBackend(...)".to_string()
+    }
+}
+
+/// CLN gRPC backend for Lightning payments.
+///
+/// Connects to a Core Lightning node via gRPC with mTLS authentication.
+///
+/// Example::
+///
+///     from bolt402 import ClnGrpcBackend
+///
+///     backend = ClnGrpcBackend(
+///         "https://localhost:9736",
+///         "/path/to/ca.pem",
+///         "/path/to/client.pem",
+///         "/path/to/client-key.pem",
+///     )
+///     info = backend.get_info()
+///     print(info.alias)
+#[pyclass(name = "ClnGrpcBackend", from_py_object)]
+#[derive(Debug, Clone)]
+struct PyClnGrpcBackend {
+    inner: Arc<ClnGrpcBackend>,
+}
+
+#[pymethods]
+impl PyClnGrpcBackend {
+    /// Create a new CLN gRPC backend using mTLS.
+    ///
+    /// Args:
+    ///     address: CLN gRPC address (e.g. ``https://localhost:9736``)
+    ///     ca_cert_path: Path to the CA certificate (``ca.pem``)
+    ///     client_cert_path: Path to the client certificate (``client.pem``)
+    ///     client_key_path: Path to the client key (``client-key.pem``)
+    #[new]
+    fn new(
+        address: &str,
+        ca_cert_path: &str,
+        client_cert_path: &str,
+        client_key_path: &str,
+    ) -> PyResult<Self> {
+        let rt = get_runtime();
+        let backend = rt
+            .block_on(ClnGrpcBackend::connect(
+                address,
+                ca_cert_path,
+                client_cert_path,
+                client_key_path,
+            ))
+            .map_err(|e| PyRuntimeError::new_err(format!("failed to connect to CLN gRPC: {e}")))?;
+        Ok(Self {
+            inner: Arc::new(backend),
+        })
+    }
+
+    /// Pay a BOLT11 Lightning invoice.
+    fn pay_invoice(&self, bolt11: &str, max_fee_sats: u64) -> PyResult<PyPaymentResult> {
+        let rt = get_runtime();
+        let inner = self.inner.clone();
+        let bolt11 = bolt11.to_string();
+        let result = rt.block_on(async move { inner.pay_invoice(&bolt11, max_fee_sats).await });
+        match result {
+            Ok(r) => Ok(PyPaymentResult { inner: r }),
+            Err(e) => Err(PyRuntimeError::new_err(format!("payment failed: {e}"))),
+        }
+    }
+
+    /// Get the current spendable balance in satoshis.
+    fn get_balance(&self) -> PyResult<u64> {
+        let rt = get_runtime();
+        let inner = self.inner.clone();
+        rt.block_on(async move { inner.get_balance().await })
+            .map_err(|e| PyRuntimeError::new_err(format!("get_balance failed: {e}")))
+    }
+
+    /// Get information about the connected Lightning node.
+    fn get_info(&self) -> PyResult<PyNodeInfo> {
+        let rt = get_runtime();
+        let inner = self.inner.clone();
+        let result = rt.block_on(async move { inner.get_info().await });
+        match result {
+            Ok(info) => Ok(PyNodeInfo { inner: info }),
+            Err(e) => Err(PyRuntimeError::new_err(format!("get_info failed: {e}"))),
+        }
+    }
+
+    #[allow(clippy::unused_self)]
+    fn __repr__(&self) -> String {
+        "ClnGrpcBackend(...)".to_string()
     }
 }
 
@@ -615,7 +787,9 @@ impl PyL402Response {
 /// Use one of the static constructor methods to create a client with a
 /// specific backend:
 ///
+/// - ``L402Client.with_lnd_grpc(...)``
 /// - ``L402Client.with_lnd_rest(...)``
+/// - ``L402Client.with_cln_grpc(...)``
 /// - ``L402Client.with_cln_rest(...)``
 /// - ``L402Client.with_swissknife(...)``
 ///
@@ -657,6 +831,35 @@ impl PyL402Client {
         build_client(backend, budget, max_fee_sats)
     }
 
+    /// Create an L402 client backed by LND gRPC.
+    ///
+    /// Args:
+    ///     address: LND gRPC address (e.g. ``https://localhost:10009``)
+    ///     tls_cert_path: Path to LND's ``tls.cert`` file
+    ///     macaroon_path: Path to an admin macaroon file
+    ///     budget: Optional budget configuration (default: unlimited)
+    ///     max_fee_sats: Maximum routing fee in satoshis (default: 100)
+    #[staticmethod]
+    #[pyo3(signature = (address, tls_cert_path, macaroon_path, budget=None, max_fee_sats=100))]
+    fn with_lnd_grpc(
+        address: &str,
+        tls_cert_path: &str,
+        macaroon_path: &str,
+        budget: Option<PyBudget>,
+        max_fee_sats: u64,
+    ) -> PyResult<Self> {
+        let rt = get_runtime();
+        let backend = rt
+            .block_on(LndGrpcBackend::connect(
+                address,
+                tls_cert_path,
+                macaroon_path,
+            ))
+            .map_err(|e| PyRuntimeError::new_err(format!("failed to connect to LND gRPC: {e}")))?;
+
+        build_client(backend, budget, max_fee_sats)
+    }
+
     /// Create an L402 client backed by CLN REST with rune auth.
     ///
     /// Args:
@@ -674,6 +877,38 @@ impl PyL402Client {
     ) -> PyResult<Self> {
         let backend = ClnRestBackend::new(url, rune)
             .map_err(|e| PyRuntimeError::new_err(format!("failed to create CLN backend: {e}")))?;
+
+        build_client(backend, budget, max_fee_sats)
+    }
+
+    /// Create an L402 client backed by CLN gRPC with mTLS.
+    ///
+    /// Args:
+    ///     address: CLN gRPC address (e.g. ``https://localhost:9736``)
+    ///     ca_cert_path: Path to the CA certificate (``ca.pem``)
+    ///     client_cert_path: Path to the client certificate (``client.pem``)
+    ///     client_key_path: Path to the client key (``client-key.pem``)
+    ///     budget: Optional budget configuration (default: unlimited)
+    ///     max_fee_sats: Maximum routing fee in satoshis (default: 100)
+    #[staticmethod]
+    #[pyo3(signature = (address, ca_cert_path, client_cert_path, client_key_path, budget=None, max_fee_sats=100))]
+    fn with_cln_grpc(
+        address: &str,
+        ca_cert_path: &str,
+        client_cert_path: &str,
+        client_key_path: &str,
+        budget: Option<PyBudget>,
+        max_fee_sats: u64,
+    ) -> PyResult<Self> {
+        let rt = get_runtime();
+        let backend = rt
+            .block_on(ClnGrpcBackend::connect(
+                address,
+                ca_cert_path,
+                client_cert_path,
+                client_key_path,
+            ))
+            .map_err(|e| PyRuntimeError::new_err(format!("failed to connect to CLN gRPC: {e}")))?;
 
         build_client(backend, budget, max_fee_sats)
     }
@@ -829,7 +1064,9 @@ fn _bolt402(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyReceipt>()?;
     m.add_class::<PyPaymentResult>()?;
     m.add_class::<PyNodeInfo>()?;
+    m.add_class::<PyLndGrpcBackend>()?;
     m.add_class::<PyLndRestBackend>()?;
+    m.add_class::<PyClnGrpcBackend>()?;
     m.add_class::<PyClnRestBackend>()?;
     m.add_class::<PySwissKnifeBackend>()?;
     m.add_class::<PyL402Response>()?;
