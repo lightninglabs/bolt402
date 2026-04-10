@@ -406,9 +406,15 @@ impl PyLndGrpcBackend {
     fn new(address: &str, tls_cert_path: &str, macaroon_path: &str) -> PyResult<Self> {
         let rt = get_runtime();
         let backend = rt
-            .block_on(LndGrpcBackend::connect(address, tls_cert_path, macaroon_path))
+            .block_on(LndGrpcBackend::connect(
+                address,
+                tls_cert_path,
+                macaroon_path,
+            ))
             .map_err(|e| PyRuntimeError::new_err(format!("failed to connect to LND gRPC: {e}")))?;
-        Ok(Self { inner: Arc::new(backend) })
+        Ok(Self {
+            inner: Arc::new(backend),
+        })
     }
 
     /// Pay a BOLT11 Lightning invoice.
@@ -576,7 +582,9 @@ impl PyClnGrpcBackend {
                 client_key_path,
             ))
             .map_err(|e| PyRuntimeError::new_err(format!("failed to connect to CLN gRPC: {e}")))?;
-        Ok(Self { inner: Arc::new(backend) })
+        Ok(Self {
+            inner: Arc::new(backend),
+        })
     }
 
     /// Pay a BOLT11 Lightning invoice.
@@ -842,7 +850,11 @@ impl PyL402Client {
     ) -> PyResult<Self> {
         let rt = get_runtime();
         let backend = rt
-            .block_on(LndGrpcBackend::connect(address, tls_cert_path, macaroon_path))
+            .block_on(LndGrpcBackend::connect(
+                address,
+                tls_cert_path,
+                macaroon_path,
+            ))
             .map_err(|e| PyRuntimeError::new_err(format!("failed to connect to LND gRPC: {e}")))?;
 
         build_client(backend, budget, max_fee_sats)
