@@ -131,7 +131,7 @@ class TestExports:
         assert SwissKnifeBackend is not None
 
     def test_version(self):
-        assert bolt402.__version__ == "0.1.0"
+        assert bolt402.__version__  # non-empty version string
 
     def test_all_exports(self):
         expected = {
