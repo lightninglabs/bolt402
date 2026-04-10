@@ -36,6 +36,10 @@ doc:
 doc-open:
 	cargo doc --workspace --no-deps --open
 
+# Build Python bindings (maturin develop)
+python:
+	cd crates/bolt402-python && .venv/bin/maturin develop
+
 # Build WASM package (default: bundler target)
 WASM_TARGET ?= bundler
 wasm:

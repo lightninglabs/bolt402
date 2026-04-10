@@ -39,12 +39,22 @@ for _p in _env_candidates:
         break
 
 L402_SERVER_URL = os.environ.get("L402_SERVER_URL", "http://localhost:8081")
+
+# LND credentials
+LND_GRPC_HOST = os.environ.get("LND_GRPC_HOST", "https://localhost:10009")
 LND_REST_HOST = os.environ.get("LND_REST_HOST", "https://localhost:8080")
 LND_MACAROON_HEX = os.environ.get("LND_MACAROON_HEX", "")
+LND_TLS_CERT_BASE64 = os.environ.get("LND_TLS_CERT_BASE64", "")
 
+# CLN credentials
+CLN_GRPC_HOST = os.environ.get("CLN_GRPC_HOST", "https://localhost:9736")
 CLN_REST_URL = os.environ.get("CLN_REST_URL", "https://localhost:3010")
 CLN_RUNE = os.environ.get("CLN_RUNE", "")
+CLN_CA_CERT_BASE64 = os.environ.get("CLN_CA_CERT_BASE64", "")
+CLN_CLIENT_CERT_BASE64 = os.environ.get("CLN_CLIENT_CERT_BASE64", "")
+CLN_CLIENT_KEY_BASE64 = os.environ.get("CLN_CLIENT_KEY_BASE64", "")
 
+# SwissKnife credentials
 SWISSKNIFE_API_URL = os.environ.get("SWISSKNIFE_API_URL", "")
 SWISSKNIFE_API_KEY = os.environ.get("SWISSKNIFE_API_KEY", "")
 
@@ -70,9 +80,30 @@ def _has_lnd_credentials() -> bool:
     return bool(LND_MACAROON_HEX)
 
 
+def _has_lnd_grpc_credentials() -> bool:
+    """Check if LND gRPC credentials are available."""
+    return bool(LND_MACAROON_HEX) and bool(LND_TLS_CERT_BASE64)
+
+
 def _has_cln_credentials() -> bool:
     """Check if CLN REST credentials are available."""
     return bool(CLN_RUNE)
+
+
+def _has_cln_grpc_credentials() -> bool:
+    """Check if CLN gRPC credentials are available."""
+    return bool(CLN_CA_CERT_BASE64) and bool(CLN_CLIENT_CERT_BASE64) and bool(CLN_CLIENT_KEY_BASE64)
+
+
+def _write_temp_file(name: str, b64_content: str) -> str:
+    """Decode base64 content and write to a temp file, return the path."""
+    import base64
+    import tempfile
+    data = base64.b64decode(b64_content)
+    path = os.path.join(tempfile.gettempdir(), f"bolt402-regtest-{name}")
+    with open(path, "wb") as f:
+        f.write(data)
+    return path
 
 
 def _has_swissknife_credentials() -> bool:
@@ -87,7 +118,15 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-from bolt402 import Budget, ClnRestBackend, L402Client, LndRestBackend, SwissKnifeBackend
+from bolt402 import (
+    Budget,
+    ClnGrpcBackend,
+    ClnRestBackend,
+    L402Client,
+    LndGrpcBackend,
+    LndRestBackend,
+    SwissKnifeBackend,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -263,6 +302,88 @@ class TestLndRestL402Flow:
 
 
 # ---------------------------------------------------------------------------
+# LND gRPC backend tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(not _has_lnd_grpc_credentials(), reason="LND gRPC credentials not available")
+class TestLndGrpcBackend:
+    """Tests for the LND gRPC backend against regtest."""
+
+    def _cert_and_macaroon_paths(self):
+        cert_path = _write_temp_file("lnd-tls.cert", LND_TLS_CERT_BASE64)
+        mac_bytes = bytes.fromhex(LND_MACAROON_HEX)
+        import tempfile
+        mac_path = os.path.join(tempfile.gettempdir(), "bolt402-regtest-admin.macaroon")
+        with open(mac_path, "wb") as f:
+            f.write(mac_bytes)
+        return cert_path, mac_path
+
+    def test_get_info(self):
+        """Verify LND gRPC node connectivity."""
+        cert_path, mac_path = self._cert_and_macaroon_paths()
+        backend = LndGrpcBackend(LND_GRPC_HOST, cert_path, mac_path)
+        info = backend.get_info()
+        assert info.pubkey
+        assert info.num_active_channels > 0
+
+    def test_get_balance(self):
+        """Verify LND gRPC balance query."""
+        cert_path, mac_path = self._cert_and_macaroon_paths()
+        backend = LndGrpcBackend(LND_GRPC_HOST, cert_path, mac_path)
+        balance = backend.get_balance()
+        assert balance > 1000
+
+
+@pytest.mark.skipif(not _has_lnd_grpc_credentials(), reason="LND gRPC credentials not available")
+class TestLndGrpcL402Flow:
+    """Full L402 protocol flow using LND gRPC backend."""
+
+    def _cert_and_macaroon_paths(self):
+        cert_path = _write_temp_file("lnd-tls.cert", LND_TLS_CERT_BASE64)
+        mac_bytes = bytes.fromhex(LND_MACAROON_HEX)
+        import tempfile
+        mac_path = os.path.join(tempfile.gettempdir(), "bolt402-regtest-admin.macaroon")
+        with open(mac_path, "wb") as f:
+            f.write(mac_bytes)
+        return cert_path, mac_path
+
+    def test_full_flow(self):
+        """GET request with automatic L402 payment via LND gRPC."""
+        cert_path, mac_path = self._cert_and_macaroon_paths()
+        client = L402Client.with_lnd_grpc(LND_GRPC_HOST, cert_path, mac_path)
+
+        response = client.get(f"{L402_SERVER_URL}/api/data")
+        assert response.status == 200
+        assert response.paid is True
+        assert response.receipt is not None
+        assert response.receipt.amount_sats == 100
+
+    def test_token_caching(self):
+        """Tokens are cached and reused."""
+        cert_path, mac_path = self._cert_and_macaroon_paths()
+        client = L402Client.with_lnd_grpc(LND_GRPC_HOST, cert_path, mac_path)
+
+        r1 = client.get(f"{L402_SERVER_URL}/api/data")
+        assert r1.paid is True
+
+        r2 = client.get(f"{L402_SERVER_URL}/api/data")
+        assert r2.paid is False
+        assert r2.cached_token is True
+
+    def test_budget_enforcement(self):
+        """Budget limits prevent overspending."""
+        cert_path, mac_path = self._cert_and_macaroon_paths()
+        budget = Budget(per_request_max=50)
+        client = L402Client.with_lnd_grpc(
+            LND_GRPC_HOST, cert_path, mac_path, budget=budget,
+        )
+
+        with pytest.raises(ValueError, match="BudgetExceeded"):
+            client.get(f"{L402_SERVER_URL}/api/data")
+
+
+# ---------------------------------------------------------------------------
 # CLN REST backend tests
 # ---------------------------------------------------------------------------
 
@@ -336,6 +457,82 @@ class TestClnRestL402Flow:
         receipts = client.receipts()
         assert len(receipts) == 2
         assert client.total_spent() == 110
+
+
+# ---------------------------------------------------------------------------
+# CLN gRPC backend tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(not _has_cln_grpc_credentials(), reason="CLN gRPC credentials not available")
+class TestClnGrpcBackend:
+    """Tests for the CLN gRPC backend against regtest."""
+
+    def _cert_paths(self):
+        ca = _write_temp_file("cln-ca.pem", CLN_CA_CERT_BASE64)
+        cert = _write_temp_file("cln-client.pem", CLN_CLIENT_CERT_BASE64)
+        key = _write_temp_file("cln-client-key.pem", CLN_CLIENT_KEY_BASE64)
+        return ca, cert, key
+
+    def test_get_info(self):
+        """Verify CLN gRPC node connectivity."""
+        ca, cert, key = self._cert_paths()
+        backend = ClnGrpcBackend(CLN_GRPC_HOST, ca, cert, key)
+        info = backend.get_info()
+        assert info.pubkey
+        assert info.num_active_channels > 0
+
+    def test_get_balance(self):
+        """Verify CLN gRPC balance query."""
+        ca, cert, key = self._cert_paths()
+        backend = ClnGrpcBackend(CLN_GRPC_HOST, ca, cert, key)
+        balance = backend.get_balance()
+        assert balance > 1000
+
+
+@pytest.mark.skipif(not _has_cln_grpc_credentials(), reason="CLN gRPC credentials not available")
+class TestClnGrpcL402Flow:
+    """Full L402 protocol flow using CLN gRPC backend."""
+
+    def _cert_paths(self):
+        ca = _write_temp_file("cln-ca.pem", CLN_CA_CERT_BASE64)
+        cert = _write_temp_file("cln-client.pem", CLN_CLIENT_CERT_BASE64)
+        key = _write_temp_file("cln-client-key.pem", CLN_CLIENT_KEY_BASE64)
+        return ca, cert, key
+
+    def test_full_flow(self):
+        """GET request with automatic L402 payment via CLN gRPC."""
+        ca, cert, key = self._cert_paths()
+        client = L402Client.with_cln_grpc(CLN_GRPC_HOST, ca, cert, key)
+
+        response = client.get(f"{L402_SERVER_URL}/api/data")
+        assert response.status == 200
+        assert response.paid is True
+        assert response.receipt is not None
+        assert response.receipt.amount_sats == 100
+
+    def test_token_caching(self):
+        """Tokens are cached and reused."""
+        ca, cert, key = self._cert_paths()
+        client = L402Client.with_cln_grpc(CLN_GRPC_HOST, ca, cert, key)
+
+        r1 = client.get(f"{L402_SERVER_URL}/api/data")
+        assert r1.paid is True
+
+        r2 = client.get(f"{L402_SERVER_URL}/api/data")
+        assert r2.paid is False
+        assert r2.cached_token is True
+
+    def test_budget_enforcement(self):
+        """Budget limits prevent overspending."""
+        ca, cert, key = self._cert_paths()
+        budget = Budget(per_request_max=50)
+        client = L402Client.with_cln_grpc(
+            CLN_GRPC_HOST, ca, cert, key, budget=budget,
+        )
+
+        with pytest.raises(ValueError, match="BudgetExceeded"):
+            client.get(f"{L402_SERVER_URL}/api/data")
 
 
 # ---------------------------------------------------------------------------
