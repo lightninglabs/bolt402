@@ -2,7 +2,6 @@ name: Publish bolt402 (Python)
 
 on:
   workflow_call:
-  workflow_dispatch:
 
 jobs:
   build-wheels:
