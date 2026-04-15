@@ -1,4 +1,4 @@
-name: Publish bolt402-wasm
+name: Publish l402-wasm
 
 on:
   workflow_call:
@@ -22,17 +22,17 @@ jobs:
       - name: Install jq
         run: sudo apt-get update -y && sudo apt-get install -y jq
       - name: Build WASM (bundler target)
-        run: wasm-pack build crates/bolt402-wasm --scope lightninglabs
-      - name: Rename package to @lightninglabs/bolt402
-        working-directory: crates/bolt402-wasm/pkg
+        run: wasm-pack build crates/l402-wasm --scope lightninglabs
+      - name: Rename package to @lightninglabs/l402
+        working-directory: crates/l402-wasm/pkg
         run: |
-          jq '.name = "@lightninglabs/bolt402"' package.json > temp.json && mv temp.json package.json
+          jq '.name = "@lightninglabs/l402"' package.json > temp.json && mv temp.json package.json
           echo "Published package.json:"
           cat package.json
       - uses: actions/cache/save@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
         with:
-          path: crates/bolt402-wasm/pkg
-          key: bolt402-wasm-${{ github.sha }}
+          path: crates/l402-wasm/pkg
+          key: l402-wasm-${{ github.sha }}
 
   dry-run:
     name: Dry-run publish
@@ -47,11 +47,11 @@ jobs:
           node-version: "22"
       - uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
         with:
-          path: crates/bolt402-wasm/pkg
-          key: bolt402-wasm-${{ github.sha }}
+          path: crates/l402-wasm/pkg
+          key: l402-wasm-${{ github.sha }}
           fail-on-cache-miss: true
       - name: Dry-run npm publish
-        working-directory: crates/bolt402-wasm/pkg
+        working-directory: crates/l402-wasm/pkg
         run: npm publish --dry-run
 
   publish:
@@ -71,11 +71,11 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
         with:
-          path: crates/bolt402-wasm/pkg
-          key: bolt402-wasm-${{ github.sha }}
+          path: crates/l402-wasm/pkg
+          key: l402-wasm-${{ github.sha }}
           fail-on-cache-miss: true
-      - name: Publish @lightninglabs/bolt402
-        working-directory: crates/bolt402-wasm/pkg
+      - name: Publish @lightninglabs/l402
+        working-directory: crates/l402-wasm/pkg
         run: npm publish --access=public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

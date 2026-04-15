@@ -1,4 +1,4 @@
-name: Publish bolt402-ai-sdk
+name: Publish l402-ai-sdk
 
 on:
   workflow_call:
@@ -17,16 +17,16 @@ jobs:
           node-version: "22"
       - run: corepack enable
       - name: Install dependencies
-        working-directory: packages/bolt402-ai-sdk
+        working-directory: packages/l402-ai-sdk
         run: yarn install
       - name: Build TypeScript
-        working-directory: packages/bolt402-ai-sdk
+        working-directory: packages/l402-ai-sdk
         run: yarn build
 
       - uses: actions/cache/save@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
         with:
-          path: packages/bolt402-ai-sdk
-          key: bolt402-ai-sdk-${{ github.sha }}
+          path: packages/l402-ai-sdk
+          key: l402-ai-sdk-${{ github.sha }}
 
   dry-run:
     name: Dry-run publish
@@ -38,11 +38,11 @@ jobs:
           node-version: "22"
       - uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
         with:
-          path: packages/bolt402-ai-sdk
-          key: bolt402-ai-sdk-${{ github.sha }}
+          path: packages/l402-ai-sdk
+          key: l402-ai-sdk-${{ github.sha }}
           fail-on-cache-miss: true
       - name: Dry-run npm publish
-        working-directory: packages/bolt402-ai-sdk
+        working-directory: packages/l402-ai-sdk
         run: npm publish --dry-run
 
   publish:
@@ -59,11 +59,11 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
         with:
-          path: packages/bolt402-ai-sdk
-          key: bolt402-ai-sdk-${{ github.sha }}
+          path: packages/l402-ai-sdk
+          key: l402-ai-sdk-${{ github.sha }}
           fail-on-cache-miss: true
-      - name: Publish @lightninglabs/bolt402-ai
-        working-directory: packages/bolt402-ai-sdk
+      - name: Publish @lightninglabs/l402-ai
+        working-directory: packages/l402-ai-sdk
         run: npm publish --access=public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
